@@ -1,0 +1,9 @@
+======================================================================
+DiCE-Duan Validation Pipeline — Summary Report
+======================================================================
+
+======================================================================
+Output files generated in:
+  Figures: /home/cerelac/DICE/data/results/validation/figures
+  Tables:  /home/cerelac/DICE/data/results/validation/tables
+======================================================================

@@ -1,0 +1,28 @@
+# DiCE-Duan Project Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core scientific computing
+numpy>=1.21.0
+pandas>=1.3.0
+scipy>=1.7.0
+
+# Bioinformatics
+biopython>=1.79
+
+# Data acquisition (optional)
+xenaPython>=0.0.1
+GEOparse>=2.0.3
+
+# Utilities
+tqdm>=4.62.0
+pyyaml>=5.4.0
+
+# For XML parsing (KEGG)
+lxml>=4.6.0
+
+# Visualization (optional)
+matplotlib>=3.4.0
+seaborn>=0.11.0
+networkx>=2.6.0
+streamlit
+pyvis

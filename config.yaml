@@ -1,0 +1,156 @@
+# DiCE-Duan Pipeline Configuration
+
+# Data Paths
+data:
+  kegg_dir: "data/raw/kegg"
+  biogrid_file: "data/raw/biogrid/BIOGRID-ALL-5.0.253.tab2.txt"
+  expression_normal: "data/raw/expression/expression_normal.txt"
+  expression_tumor: "data/raw/expression/expression_tumor.txt"
+  output_dir: "data/results"
+
+# Network Construction Parameters
+network:
+  # Organism taxonomy ID (9606 = Homo sapiens)
+  organism_id: 9606
+  
+  # Remove self-loops
+  remove_self_loops: true
+  
+  # Remove duplicate edges
+  remove_duplicates: true
+  
+  # Minimum interaction confidence (for future filtering)
+  min_confidence: 0.0
+
+# Expression Data Parameters
+expression:
+  # Scale factor for converting float weights to integers
+  # Higher = more precision, but larger numbers
+  weight_scale_factor: 1000
+  
+  # Minimum weight to avoid zero (epsilon)
+  min_weight: 0.000001
+  
+  # Gene ID type: "symbol" or "entrez"
+  gene_id_type: "symbol"
+  
+  # Normalization method: "none", "log2", "zscore"
+  normalization: "none"
+
+# Centrality Computation Parameters
+centrality:
+  # Centrality measures to compute
+  measures:
+    - "betweenness"
+    - "eigenvector"
+  
+  # Sampling for ASPL computation (0 = all nodes)
+  # Use 100-500 for large networks to save time
+  aspl_sample_size: 100
+  
+  # Eigenvector centrality iterations
+  eigenvector_iterations: 100
+
+# Differential Analysis Parameters
+differential:
+  # Threshold for filtering genes
+  # Options: "mean", "median", or numeric value
+  min_centrality_threshold: "mean"
+  
+  # Number of top DiCE genes to save
+  top_n_genes: 500
+  
+  # Ensemble ranking method
+  # Options: "product" (default), "sum", "mean"
+  ensemble_method: "product"
+
+# Virtual Knockout Parameters
+knockout:
+  # Enable virtual knockout analysis
+  enabled: true
+  
+  # Number of top genes to test
+  n_genes_to_test: 50
+  
+  # Compute ASPL change
+  compute_vitality: true
+
+# Output Parameters
+output:
+  # Save intermediate files
+  save_intermediates: true
+  
+  # Compression for large files
+  compress_outputs: false
+  
+  # Generate summary statistics
+  generate_summary: true
+  
+  # Create visualization
+  create_plots: true
+
+# Performance Parameters
+performance:
+  # Number of parallel threads (0 = auto)
+  n_threads: 0
+  
+  # Memory limit in GB (0 = unlimited)
+  memory_limit: 0
+  
+  # Verbosity level: 0=quiet, 1=normal, 2=verbose
+  verbosity: 1
+
+# Duan Algorithm Parameters (Advanced)
+duan:
+  # Parameter k (controls recursion depth)
+  # Auto-computed as: k = max(2, cbrt(n))
+  k_auto: true
+  k_value: 2
+  
+  # Parameter t (controls hierarchy levels)
+  # Auto-computed as: t = max(2, n^(2/3))
+  t_auto: true
+  t_value: 2
+  
+  # Maximum levels in hierarchy
+  # Auto-computed as: ceil(log(n) / log(t))
+  max_levels_auto: true
+  max_levels: 10
+
+# Analysis Presets
+presets:
+  # Quick test run
+  test:
+    expression:
+      weight_scale_factor: 100
+    centrality:
+      aspl_sample_size: 50
+    differential:
+      top_n_genes: 100
+    knockout:
+      n_genes_to_test: 10
+  
+  # Standard analysis
+  standard:
+    expression:
+      weight_scale_factor: 1000
+    centrality:
+      aspl_sample_size: 100
+    differential:
+      top_n_genes: 500
+    knockout:
+      n_genes_to_test: 50
+  
+  # Comprehensive analysis
+  comprehensive:
+    expression:
+      weight_scale_factor: 10000
+    centrality:
+      aspl_sample_size: 0  # Use all nodes
+    differential:
+      top_n_genes: 1000
+    knockout:
+      n_genes_to_test: 100
+
+# Active preset (overrides default parameters)
+active_preset: "standard"

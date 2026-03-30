@@ -1,0 +1,305 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Cyberpunk Biotech Theme - Dark Mode */
+    --background: 0 0% 4%;
+    --foreground: 220 14% 96%;
+    --card: 220 7% 8%;
+    --card-foreground: 220 14% 96%;
+    --popover: 220 7% 8%;
+    --popover-foreground: 220 14% 96%;
+    --primary: 183 100% 50%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 220 7% 12%;
+    --secondary-foreground: 220 14% 96%;
+    --muted: 220 7% 15%;
+    --muted-foreground: 215 14% 68%;
+    --accent: 183 100% 50%;
+    --accent-foreground: 0 0% 4%;
+    --destructive: 335 100% 58%;
+    --destructive-foreground: 220 14% 96%;
+    --border: 220 7% 18%;
+    --input: 220 7% 15%;
+    --ring: 183 100% 50%;
+    --radius: 1rem;
+    
+    /* Custom colors */
+    --neon-cyan: #00F0FF;
+    --neon-magenta: #FF2D8D;
+    --neon-gold: #FFD166;
+    --void-black: #0A0A0A;
+    --panel-charcoal: #111214;
+    --text-primary: #F2F4F8;
+    --text-secondary: #A6AEB8;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-[#0A0A0A] text-[#F2F4F8] antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+  
+  ::selection {
+    background: rgba(0, 240, 255, 0.3);
+    color: #F2F4F8;
+  }
+}
+
+@layer components {
+  /* Glassmorphism Card */
+  .glass-card {
+    @apply relative rounded-[18px] border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl;
+    box-shadow: 
+      0 24px 70px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  .glass-card-sm {
+    @apply relative rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl;
+    box-shadow: 
+      0 16px 40px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  /* Neon Glow Effects */
+  .glow-cyan {
+    box-shadow: 
+      0 0 20px rgba(0, 240, 255, 0.3),
+      0 0 40px rgba(0, 240, 255, 0.15),
+      0 0 60px rgba(0, 240, 255, 0.08);
+  }
+  
+  .glow-magenta {
+    box-shadow: 
+      0 0 20px rgba(255, 45, 141, 0.3),
+      0 0 40px rgba(255, 45, 141, 0.15),
+      0 0 60px rgba(255, 45, 141, 0.08);
+  }
+  
+  .glow-gold {
+    box-shadow: 
+      0 0 20px rgba(255, 209, 102, 0.3),
+      0 0 40px rgba(255, 209, 102, 0.15),
+      0 0 60px rgba(255, 209, 102, 0.08);
+  }
+  
+  /* Text Glow */
+  .text-glow-cyan {
+    text-shadow: 
+      0 0 10px rgba(0, 240, 255, 0.5),
+      0 0 20px rgba(0, 240, 255, 0.3),
+      0 0 30px rgba(0, 240, 255, 0.2);
+  }
+  
+  .text-glow-magenta {
+    text-shadow: 
+      0 0 10px rgba(255, 45, 141, 0.5),
+      0 0 20px rgba(255, 45, 141, 0.3),
+      0 0 30px rgba(255, 45, 141, 0.2);
+  }
+  
+  /* Gradient Backgrounds */
+  .gradient-mesh {
+    background: 
+      radial-gradient(ellipse at 20% 30%, rgba(0, 240, 255, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(255, 45, 141, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(0, 240, 255, 0.04) 0%, transparent 70%);
+  }
+  
+  /* Typography */
+  .font-display {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  
+  .font-mono-data {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  /* Button Styles */
+  .btn-glass {
+    @apply relative px-6 py-3 rounded-full font-medium transition-all duration-300;
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    background-color: rgba(0, 240, 255, 0.05);
+    color: #00F0FF;
+  }
+  
+  .btn-glass:hover {
+    background-color: rgba(0, 240, 255, 0.12);
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+  }
+  
+  /* Toggle Switch */
+  .toggle-pill {
+    @apply relative inline-flex h-10 w-44 items-center rounded-full 
+           border border-white/10 bg-white/5 p-1;
+  }
+  
+  .toggle-option {
+    @apply relative z-10 flex-1 text-center text-sm font-medium transition-colors duration-300;
+  }
+  
+  .toggle-slider {
+    @apply absolute h-8 w-[calc(50%-4px)] rounded-full transition-all duration-300;
+  }
+  
+  /* Progress Bar */
+  .progress-bar {
+    @apply h-2 rounded-full bg-white/10 overflow-hidden;
+  }
+  
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-700 ease-out;
+  }
+  
+  /* Table Styles */
+  .data-table {
+    @apply w-full border-collapse;
+  }
+  
+  .data-table th {
+    @apply px-4 py-3 text-left text-xs font-medium text-[#A6AEB8] uppercase tracking-wider
+           border-b border-white/10;
+  }
+  
+  .data-table td {
+    @apply px-4 py-3 text-sm border-b border-white/5;
+  }
+  
+  .data-table tr:hover td {
+    @apply bg-[#00F0FF]/5;
+  }
+  
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 240, 255, 0.3);
+  }
+}
+
+@layer utilities {
+  /* Animation Utilities */
+  .animate-float {
+    animation: float 3.5s ease-in-out infinite;
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse-slow 4s ease-in-out infinite;
+  }
+  
+  .animate-glow-pulse {
+    animation: glow-pulse 2s ease-in-out infinite;
+  }
+  
+  /* Grain Overlay */
+  .grain-overlay::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    z-index: 9999;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(0, 240, 255, 0.3),
+      0 0 40px rgba(0, 240, 255, 0.15);
+  }
+  50% {
+    box-shadow: 
+      0 0 30px rgba(0, 240, 255, 0.5),
+      0 0 60px rgba(0, 240, 255, 0.25);
+  }
+}
+
+/* Cytoscape Styles */
+#cy {
+  width: 100%;
+  height: 100%;
+}
+
+#cy .node {
+  transition: all 0.3s ease;
+}
+
+/* Recharts Customization */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.06);
+}
+
+.recharts-text {
+  fill: #A6AEB8;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+/* Network Graph Container */
+.network-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.network-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 240, 255, 0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
