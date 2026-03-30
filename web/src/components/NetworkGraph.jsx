@@ -50,7 +50,9 @@ const NetworkGraph = ({
             type: node.type || 'normal',
             status: node.status,
             rank: node.rank,
-            size: nodeSize
+            size: nodeSize,
+            log2fc: node.log2fc,
+            is_essential: node.is_essential
           }
         };
       }),
@@ -76,6 +78,10 @@ const NetworkGraph = ({
               if (mode === 'ego' && ele.data('status')) {
                 return getStatusColor(ele.data('status'));
               }
+              const l2fc = ele.data('log2fc');
+              if (l2fc !== undefined && l2fc !== 0) {
+                return l2fc > 0 ? '#EF4444' : '#3B82F6'; // TailWind Red-500 or Blue-500
+              }
               return nodeColor;
             },
             'width': (ele) => ele.data('size') || 16,
@@ -91,7 +97,17 @@ const NetworkGraph = ({
             'text-background-opacity': 0.8,
             'text-background-padding': '2px 4px',
             'text-background-shape': 'roundrectangle',
-            'border-width': 0,
+            'border-width': (ele) => {
+              // Priority: is_essential -> selected -> none
+              if (ele.selected()) return 3;
+              if (ele.data('is_essential')) return 2;
+              return 0;
+            },
+            'border-color': (ele) => {
+              if (ele.selected()) return '#FFD166';
+              if (ele.data('is_essential')) return '#10B981'; // Tailwind Emerald-500
+              return '#000000';
+            },
             'transition-property': 'background-color, border-width, border-color, width, height',
             'transition-duration': '0.3s'
           }
@@ -451,17 +467,25 @@ const NetworkGraph = ({
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-4 text-xs flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#EF4444]" />
+              <span className="text-[#A6AEB8]">Upregulated Hub</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#3B82F6]" />
+              <span className="text-[#A6AEB8]">Downregulated Hub</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full border-2 border-[#10B981] bg-transparent" />
+              <span className="text-[#A6AEB8]">Essential</span>
+            </div>
             <div className="flex items-center gap-2">
               <div 
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: tissue === 'normal' ? '#00F0FF' : '#FF2D8D' }}
               />
               <span className="text-[#A6AEB8]">Network Gene</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-[#FFD166]" />
-              <span className="text-[#A6AEB8]">Selected</span>
             </div>
           </div>
         )}

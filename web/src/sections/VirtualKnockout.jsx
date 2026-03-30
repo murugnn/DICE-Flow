@@ -230,6 +230,9 @@ const VirtualKnockout = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-[#A6AEB8] uppercase tracking-wider">
                       Gene
                     </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-[#A6AEB8] uppercase tracking-wider">
+                      Essential
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-[#A6AEB8] uppercase tracking-wider">
                       Vitality
                     </th>
@@ -264,6 +267,19 @@ const VirtualKnockout = () => {
                         <span className="font-mono-data font-bold text-[#F2F4F8] text-sm">
                           {gene.gene}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        {gene.is_essential ? (
+                          <div className="flex justify-center">
+                            <span className="flex items-center justify-center p-1 rounded-full bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30" title="CRISPR Essential (DepMap)">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[#A6AEB8]/30">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right">
                         <span
