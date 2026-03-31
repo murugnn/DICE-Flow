@@ -25,12 +25,15 @@ DATA_STORE = {
     "G_normal": None,
     "G_tumor": None,
     "knockout_df": None,
-    "top_genes": [] 
+    "top_genes": [],
+    "log2fc_map": {},
+    "essential_genes": set()
 }
 
 BASE_DIR = Path(__file__).parent.parent.parent
 PROCESSED_DIR = BASE_DIR / "data/processed/weighted"
 RESULTS_DIR = BASE_DIR / "data/results"
+TABLES_DIR = RESULTS_DIR / "validation/tables"
 
 def load_graph(file_path: Path) -> nx.Graph:
     if not file_path.exists():
@@ -60,6 +63,18 @@ async def startup_event():
         df_top = pd.read_csv(dice_path, sep='\t')
         DATA_STORE["top_genes"] = df_top['gene'].tolist()
 
+    # 4. Load Biological Annotations (DEA)
+    dea_path = RESULTS_DIR / "dea_results_table.txt"
+    if dea_path.exists():
+        dea_df = pd.read_csv(dea_path, sep='\t')
+        DATA_STORE["log2fc_map"] = dict(zip(dea_df['gene'], dea_df['log2FC']))
+        
+    # 5. Load Essentiality Annotations (DepMap)
+    essential_path = TABLES_DIR / "09_fitness_overlap_genes.csv"
+    if essential_path.exists():
+        ess_df = pd.read_csv(essential_path)
+        DATA_STORE["essential_genes"] = set(ess_df['gene'].tolist())
+
     logger.info("Server Ready.")
 
 # --- HELPER FUNCTIONS ---
@@ -68,15 +83,23 @@ def build_subgraph_json(G: nx.Graph, nodes: list):
     """Creates a D3/Recharts compatible JSON for a subset of nodes"""
     subgraph = G.subgraph(nodes)
     
+    log2fc_map = DATA_STORE["log2fc_map"]
+    essential_genes = DATA_STORE["essential_genes"]
+    
     response_nodes = []
     for n in subgraph.nodes():
         # Add a "group" or "rank" to help coloring
         # We assume the input list 'nodes' is already sorted by rank
         rank = nodes.index(n) + 1 if n in nodes else 999
+        log2fc = float(log2fc_map.get(n, 0.0))
+        is_essential = n in essential_genes
+        
         response_nodes.append({
             "id": n, 
             "label": n, 
-            "rank": rank
+            "rank": rank,
+            "log2fc": log2fc,
+            "is_essential": is_essential
         })
         
     response_links = []
@@ -90,7 +113,15 @@ def build_subgraph_json(G: nx.Graph, nodes: list):
     return {"nodes": response_nodes, "links": response_links}
 
 def get_path_details(G, path):
-    nodes = [{"id": n, "label": n} for n in path]
+    log2fc_map = DATA_STORE["log2fc_map"]
+    essential_genes = DATA_STORE["essential_genes"]
+    
+    nodes = [{
+        "id": n, 
+        "label": n,
+        "log2fc": float(log2fc_map.get(n, 0.0)),
+        "is_essential": n in essential_genes
+    } for n in path]
     links = []
     total_cost = 0.0
     
@@ -115,16 +146,16 @@ def get_path_details(G, path):
 # --- ENDPOINTS ---
 
 @app.get("/api/network/initial")
-async def get_initial_network(limit: int = 30):
+async def get_initial_network(limit: int = 150):
     """
-    Returns the 'Skeleton Network': The Top N DiCE genes (default 50).
-    Input: ?limit=50
+    Returns the 'Skeleton Network': The Top N DiCE genes (default 150).
+    Input: ?limit=150
     """
     top_genes = DATA_STORE["top_genes"]
     if not top_genes:
         return {"nodes": [], "links": []}
     
-    # 1. Slice the list to the requested limit (e.g., top 50)
+    # 1. Slice the list to the requested limit (e.g., top 150)
     subset_genes = top_genes[:limit]
     
     # 2. Use Tumor graph 
@@ -144,7 +175,14 @@ async def get_knockout():
     
     df['vitality_score'] = pd.to_numeric(df['vitality_score'], errors='coerce')
     sorted_df = df.sort_values(by="vitality_score", ascending=False).head(50)
-    return sorted_df.to_dict(orient="records")
+    
+    records = sorted_df.to_dict(orient="records")
+    essential_genes = DATA_STORE["essential_genes"]
+    
+    for row in records:
+        row["is_essential"] = row.get("gene") in essential_genes
+        
+    return records
 
 @app.get("/api/path")
 async def get_path(source: str, target: str):
@@ -210,7 +248,15 @@ async def get_rewiring(gene: str):
     
     all_neighbors = neighbors_n.union(neighbors_t)
     
-    nodes = [{"id": gene, "type": "hub"}]
+    log2fc_map = DATA_STORE["log2fc_map"]
+    essential_genes = DATA_STORE["essential_genes"]
+    
+    nodes = [{
+        "id": gene, 
+        "type": "hub", 
+        "log2fc": float(log2fc_map.get(gene, 0.0)),
+        "is_essential": gene in essential_genes
+    }]
     links = []
     
     # Limit to top 30 neighbors
@@ -231,7 +277,13 @@ async def get_rewiring(gene: str):
             status = "maintained"
             weight = (G_n[gene][n]['weight'] + G_t[gene][n]['weight']) / 2
             
-        nodes.append({"id": n, "type": "neighbor", "status": status})
+        nodes.append({
+            "id": n, 
+            "type": "neighbor", 
+            "status": status,
+            "log2fc": float(log2fc_map.get(n, 0.0)),
+            "is_essential": n in essential_genes
+        })
         links.append({
             "source": gene,
             "target": n,

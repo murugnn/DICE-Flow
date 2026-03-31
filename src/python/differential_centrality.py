@@ -65,12 +65,16 @@ class DifferentialCentralityAnalyzer:
                           (merged['betweenness_tumor'] > avg_bet_tumor)
                
         # Apply combined strict filtering mask
-        filtered_df = merged[mask_not_hub & mask_not_periph].copy()
-        
-        logger.info(f"Filtering: Started with {len(merged)} genes.")
-        logger.info(f"  - Removed {len(merged) - mask_not_hub.sum()} high-eigenvector noise genes")
-        logger.info(f"  - Removed {len(merged) - mask_not_periph.sum()} low-betweenness peripheral genes")
-        logger.info(f"  - Final retained pool: {len(filtered_df)} genes")
+        if getattr(self, 'disable_noise', False):
+            filtered_df = merged.copy()
+            logger.info("NOISE FILTER DISABLED: Retaining ultra-hubs like EP300 and peripheral nodes.")
+        else:
+            filtered_df = merged[mask_not_hub & mask_not_periph].copy()
+            
+            logger.info(f"Filtering: Started with {len(merged)} genes.")
+            logger.info(f"  - Removed {len(merged) - mask_not_hub.sum()} high-eigenvector noise genes")
+            logger.info(f"  - Removed {len(merged) - mask_not_periph.sum()} low-betweenness peripheral genes")
+            logger.info(f"  - Final retained pool: {len(filtered_df)} genes")
         
         # 5. Sort by Ensemble Score (Descending)
         filtered_df = filtered_df.sort_values('ensemble_score', ascending=False)
@@ -92,10 +96,16 @@ def main():
     parser.add_argument('--tumor', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--top-n', type=int, default=500)
+    parser.add_argument('--disable-noise', action='store_true', help='Skip Phase 5 12% hub removal')
     
     args = parser.parse_args()
     
     analyzer = DifferentialCentralityAnalyzer(args.normal, args.tumor)
+    if getattr(args, 'disable_noise', False):
+        analyzer.disable_noise = True
+    else:
+        analyzer.disable_noise = False
+        
     dice_df = analyzer.analyze()
     
     if dice_df.empty:

@@ -59,12 +59,17 @@ mkdir -p "$PROCESSED_DIR/networks" "$PROCESSED_DIR/weighted" "$RESULTS_DIR"
 MODE="full"  # full, test, or custom
 USE_DUMMY=false
 SKIP_BUILD=false
+GLOBAL_MODE=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --test)
             MODE="test"
             USE_DUMMY=true
+            shift
+            ;;
+        --global)
+            GLOBAL_MODE=1
             shift
             ;;
         --skip-build)
@@ -76,6 +81,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --test          Run with dummy data"
+            echo "  --global        Run on full interactome (skip filtering)"
             echo "  --skip-build    Skip C++ compilation"
             echo "  --help          Show this help message"
             exit 0
@@ -86,6 +92,10 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [ "$GLOBAL_MODE" -eq 1 ]; then
+    log_warn "Running in GLOBAL mode. Bypassing DEA and IG filters to compute the entire human interactome."
+fi
 
 # ============================================================================
 # Step 0: Build C++ Engine
@@ -143,10 +153,11 @@ if [ ! -f "$NORMAL_EXPR" ] || [ ! -f "$TUMOR_EXPR" ]; then
     exit 1
 fi
 
-DEGS_FILE="$PROCESSED_DIR/significant_degs.txt"
+# Step 1.2: Perform DEA
+log_info "Performing differential expression analysis (T-Test, FDR < 0.05, |LFC| > 1)..."
+DEGS_FILE="$PROCESSED_DIR/dea_filtered_genes.txt"
 DEA_RESULTS="$RESULTS_DIR/dea_results_table.txt"
 
-log_info "Running Differential Expression Analysis filter..."
 $PYTHON src/python/dea_filter.py \
     --normal "$NORMAL_EXPR" \
     --tumor "$TUMOR_EXPR" \
@@ -196,15 +207,25 @@ $PYTHON src/python/parse_biogrid.py \
     --output "$BIOGRID_OUTPUT" \
     --organism 9606
 
-# Step 3.3: Merge networks (FILTERED BY CANDIDATES)
-log_info "Merging KEGG and BioGRID networks (Filtered to candidates)..."
-MERGED_NETWORK="$PROCESSED_DIR/networks/merged_network.txt"
+# Step 3.3: Merge networks
+if [ "$GLOBAL_MODE" -eq 1 ]; then
+    log_info "Merging KEGG and BioGRID networks (GLOBAL: No candidate filter)..."
+    MERGED_NETWORK="$PROCESSED_DIR/networks/merged_network.txt"
 
-$PYTHON src/python/merge_networks.py \
-    --kegg "$KEGG_OUTPUT" \
-    --biogrid "$BIOGRID_OUTPUT" \
-    --candidates "$FINAL_CANDIDATES" \
-    --output "$MERGED_NETWORK"
+    $PYTHON src/python/merge_networks.py \
+        --kegg "$KEGG_OUTPUT" \
+        --biogrid "$BIOGRID_OUTPUT" \
+        --output "$MERGED_NETWORK"
+else
+    log_info "Merging KEGG and BioGRID networks (Filtered to candidates)..."
+    MERGED_NETWORK="$PROCESSED_DIR/networks/merged_network.txt"
+
+    $PYTHON src/python/merge_networks.py \
+        --kegg "$KEGG_OUTPUT" \
+        --biogrid "$BIOGRID_OUTPUT" \
+        --candidates "$FINAL_CANDIDATES" \
+        --output "$MERGED_NETWORK"
+fi
 
 if [ ! -f "$MERGED_NETWORK" ]; then
     log_error "Network merging failed"
@@ -280,11 +301,21 @@ fi
 log_info "Computing differential centrality..."
 DICE_GENES="$RESULTS_DIR/dice_genes.txt"
 
-$PYTHON src/python/differential_centrality.py \
-    --normal "$NORMAL_CENTRALITY" \
-    --tumor "$TUMOR_CENTRALITY" \
-    --output "$DICE_GENES" \
-    --top-n 500
+if [ "$GLOBAL_MODE" -eq 1 ]; then
+    log_info "GLOBAL MODE: Disabling Phase 5 noise filter to retain hyper-hubs like EP300..."
+    $PYTHON src/python/differential_centrality.py \
+        --normal "$NORMAL_CENTRALITY" \
+        --tumor "$TUMOR_CENTRALITY" \
+        --output "$DICE_GENES" \
+        --top-n 500 \
+        --disable-noise
+else
+    $PYTHON src/python/differential_centrality.py \
+        --normal "$NORMAL_CENTRALITY" \
+        --tumor "$TUMOR_CENTRALITY" \
+        --output "$DICE_GENES" \
+        --top-n 500
+fi
 
 if [ ! -f "$DICE_GENES" ]; then
     log_error "Differential centrality analysis failed"
