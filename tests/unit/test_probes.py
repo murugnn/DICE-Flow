@@ -42,3 +42,24 @@ def test_parsers_probe_counts_edges_and_unique_genes(tmp_path):
     assert m["biogrid"]["n_edges"] == 3
     assert m["biogrid"]["duplicate_edges"] == 1
     assert m["biogrid"]["unique_genes"] == 3
+
+
+from src.python.diagnostics.probes.merge import MergeProbe
+
+
+def test_merge_probe_counts_directed_undirected(tmp_path):
+    merged = tmp_path / "merged.txt"
+    merged.write_text(
+        "source\ttarget\tdirected\n"
+        "A\tB\ttrue\n"
+        "B\tA\ttrue\n"        # forms a 2-cycle but each entry is directed
+        "C\tD\tfalse\n"
+        "D\tE\tfalse\n"
+    )
+    r = MergeProbe().run(ctx={"merged_network": str(merged)})
+    m = r.measurements
+    assert m["n_edges"] == 4
+    assert m["n_directed"] == 2
+    assert m["n_undirected"] == 2
+    assert m["unique_genes"] == 5
+    assert m["bidirectional_pairs"] == 1   # A-B has both directions
