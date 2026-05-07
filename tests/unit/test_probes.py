@@ -186,3 +186,26 @@ def test_differential_probe_finds_hub_kills(tmp_path):
     assert "TP53" in m["top12_eig_dropped_genes"]
     assert "EP300" in m["top12_eig_dropped_genes"]
     assert m["top12_eig_dropped_in_cgc"] >= 2
+
+
+from src.python.diagnostics.probes.validation import ValidationProbe
+
+
+def test_validation_probe_reports_overlap_and_join_rate(tmp_path):
+    dice = tmp_path / "dice.tsv"
+    dice.write_text("gene\nG1\nG2\nG3\nG4\nG5\n")
+    deg  = tmp_path / "deg.tsv"
+    deg.write_text("gene\nG3\nG4\nG6\n")
+    depmap = tmp_path / "depmap.tsv"
+    depmap.write_text("gene\tdependency_score\nG1\t-0.5\nG3\t-0.7\nG7\t0.0\n")
+
+    r = ValidationProbe().run(ctx={
+        "dice_genes": str(dice),
+        "deg_genes": str(deg),
+        "depmap_table": str(depmap),
+    })
+    m = r.measurements
+    assert m["dice_deg_overlap"]["observed"] == 2
+    assert 0.0 < m["dice_deg_overlap"]["hypergeom_p"] <= 1.0
+    assert m["depmap"]["join_match_count"] == 2
+    assert m["depmap"]["join_match_rate"] == pytest.approx(0.4)
