@@ -46,3 +46,20 @@ TEST_CASE("Brandes on directed star with no transit yields zero centrality") {
     auto bet = calc.compute_betweenness();
     for (auto v : bet) CHECK(v == doctest::Approx(0.0));
 }
+
+// Bootstrap CI must produce per-vertex bounds that bracket the point estimate.
+TEST_CASE("brandes_with_ci returns CI bounds spanning the point estimate") {
+    Graph<long long> g(10);
+    for (int i = 0; i < 9; ++i) g.add_edge(i, i + 1, 1);
+    g.id_to_name.resize(10);
+
+    CentralityCalculator<long long> calc(g);
+    auto res = calc.brandes_with_ci(/*sample_rate=*/0.3, /*B=*/20, /*seed=*/42);
+    CHECK(res.point.size() == 10);
+    CHECK(res.ci_lo.size() == 10);
+    CHECK(res.ci_hi.size() == 10);
+    for (size_t i = 0; i < res.point.size(); ++i) {
+        CHECK(res.ci_lo[i] <= res.point[i] + 1e-6);
+        CHECK(res.ci_hi[i] >= res.point[i] - 1e-6);
+    }
+}
