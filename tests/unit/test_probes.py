@@ -135,3 +135,21 @@ def test_weighting_probe_explains_edge_loss(tmp_path):
     assert m["epsilon_clamped_edges"] >= 1
     # merged net has 7 unique genes (A,B,ZZUNKNOWN,C,D,E,F); expr has 6 -> 6/7
     assert m["gene_symbol_resolution_rate"] == pytest.approx(6/7)
+
+
+import json
+from src.python.diagnostics.probes.centrality import CentralityProbe
+
+
+def test_centrality_probe_computes_spearman(tmp_path):
+    diag = tmp_path / "cpp_diagnostics.json"
+    diag.write_text(json.dumps({
+        "omp_determinism_max_relative_drift": 0.0,
+        "sampled_vs_full_subgraph_n": 5,
+        "sampled_full_betweenness": [0.0, 1.0, 2.0, 3.0, 4.0],
+        "sampled_betweenness":      [0.1, 1.1, 2.1, 3.1, 4.1],
+    }))
+    r = CentralityProbe().run(ctx={"cpp_diagnostics_json": str(diag)})
+    m = r.measurements
+    assert m["omp_determinism_max_relative_drift"] == 0.0
+    assert m["sampled_vs_full_spearman_rho"] == pytest.approx(1.0)
