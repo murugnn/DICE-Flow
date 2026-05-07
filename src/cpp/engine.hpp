@@ -11,6 +11,8 @@
 #include <chrono>
 #include <omp.h>
 #include <set>
+#include <numeric>
+#include <random>
 
 // ============================================================================
 // SHARED GRAPH STRUCTURE
@@ -375,21 +377,23 @@ class CentralityCalculator {
 public:
     explicit CentralityCalculator(const Graph<WeightType>& g) : graph(g), engine(g) {}
     
-    std::vector<double> compute_betweenness() {
+    // Run Brandes accumulation over an arbitrary list of source vertices.
+    // Pure refactor: same per-source body as the historical compute_betweenness.
+    std::vector<double> compute_betweenness_from_sources(const std::vector<int>& sources) {
         int n = graph.n_vertices;
         std::vector<double> betweenness(n, 0.0);
-        int step = (n > 1000) ? n / 100 : 1; 
-        for (int s = 0; s < n; s += step) {
+        for (int s : sources) {
+            if (s < 0 || s >= n) continue;
             std::vector<WeightType> dist = engine.compute_sssp(s);
             std::vector<double> sigma(n, 0.0);
             std::vector<std::vector<int>> pred(n);
             std::vector<int> stack;
             sigma[s] = 1.0;
-            
+
             std::vector<std::pair<WeightType, int>> sorted;
             for(int i=0; i<n; ++i) if(dist[i] != std::numeric_limits<WeightType>::max()) sorted.push_back({dist[i], i});
             std::sort(sorted.begin(), sorted.end());
-            
+
             for(auto& p : sorted) {
                 int u = p.second;
                 stack.push_back(u);
@@ -408,6 +412,32 @@ public:
             }
         }
         return betweenness;
+    }
+
+    std::vector<double> compute_betweenness() {
+        int n = graph.n_vertices;
+        // Historical sampling: stride n/100 when n>1000, else every node.
+        int step = (n > 1000) ? n / 100 : 1;
+        std::vector<int> sources;
+        sources.reserve(n / std::max(step, 1) + 1);
+        for (int s = 0; s < n; s += step) sources.push_back(s);
+        return compute_betweenness_from_sources(sources);
+    }
+
+    // Seeded sampled overload. sample_rate >= 1.0 -> full Brandes (every vertex).
+    // For sample_rate < 1.0, deterministically picks ceil(n * sample_rate)
+    // sources via a seeded mt19937_64 shuffle.
+    std::vector<double> compute_betweenness(double sample_rate, uint64_t seed) {
+        int n = graph.n_vertices;
+        std::vector<int> sources(n);
+        std::iota(sources.begin(), sources.end(), 0);
+        if (sample_rate < 1.0) {
+            std::mt19937_64 rng(seed);
+            std::shuffle(sources.begin(), sources.end(), rng);
+            int k = std::max<int>(1, int(std::ceil(n * sample_rate)));
+            sources.resize(k);
+        }
+        return compute_betweenness_from_sources(sources);
     }
 
     std::vector<double> compute_eigenvector_weighted() {
@@ -440,5 +470,23 @@ public:
         return v;
     }
 };
+
+// ============================================================================
+// SUBGRAPH HELPER (used by --diagnostics-out)
+// ============================================================================
+template<typename W>
+Graph<W> induce_subgraph(const Graph<W>& g, int k) {
+    if (k > g.n_vertices) k = g.n_vertices;
+    if (k < 0) k = 0;
+    Graph<W> s(k);
+    for (int u = 0; u < k; ++u)
+        for (auto& e : g.adj[u])
+            if (e.to < k) s.add_edge(u, e.to, e.weight);
+    if (!g.id_to_name.empty()) {
+        s.id_to_name.assign(g.id_to_name.begin(),
+                            g.id_to_name.begin() + std::min<int>(k, g.id_to_name.size()));
+    }
+    return s;
+}
 
 #endif

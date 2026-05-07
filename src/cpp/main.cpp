@@ -212,6 +212,15 @@ int main(int argc, char* argv[]) {
     std::string mode = (argc > 4) ? argv[4] : "full";
     std::string gene_list = (argc > 5) ? argv[5] : "";
 
+    // Optional diagnostics output (Phase 1 audit): if --diagnostics-out PATH
+    // appears anywhere after the positional args, emit a small JSON dossier
+    // covering OMP determinism + sampled-vs-full Brandes on a sub-induced graph.
+    std::string diag_out;
+    for (int i = 4; i < argc - 1; ++i) {
+        std::string a = argv[i];
+        if (a == "--diagnostics-out") { diag_out = argv[i + 1]; break; }
+    }
+
     try {
         // --------------------------------------------------------------------
         // BENCHMARK MODE (The "Thesis Proof")
@@ -286,6 +295,48 @@ int main(int argc, char* argv[]) {
         }
 
         std::cout << "\n=== Analysis Complete ===" << std::endl;
+
+        // ----------------------------------------------------------------
+        // DIAGNOSTICS MODE (Phase 1 audit). Runs after main analysis.
+        // ----------------------------------------------------------------
+        if (!diag_out.empty()) {
+            std::cerr << "[diagnostics] writing " << diag_out << std::endl;
+
+            // (a) OMP determinism: 5 runs of seeded sampled betweenness on
+            // tumor graph; record max relative drift vs. first run.
+            CentralityCalculator<long long> c_t(tumor_graph);
+            auto base = c_t.compute_betweenness(0.1, 42);
+            double max_drift = 0.0;
+            for (int t = 0; t < 5; ++t) {
+                auto r = c_t.compute_betweenness(0.1, 42);
+                for (size_t i = 0; i < base.size(); ++i) {
+                    double denom = std::max(1e-12, std::abs(base[i]));
+                    double d = std::abs(r[i] - base[i]) / denom;
+                    if (d > max_drift) max_drift = d;
+                }
+            }
+
+            // (b) Sampled vs full Brandes on a min(1000,n)-induced subgraph
+            // of the tumor network. Python side computes Spearman from JSON.
+            int k = std::min(1000, tumor_graph.n_vertices);
+            auto sub = induce_subgraph<long long>(tumor_graph, k);
+            CentralityCalculator<long long> c_sub(sub);
+            auto bet_full = c_sub.compute_betweenness(1.0, 42);
+            auto bet_smp  = c_sub.compute_betweenness(0.1, 42);
+
+            std::ofstream out(diag_out);
+            out << std::setprecision(12);
+            out << "{\n";
+            out << "  \"omp_determinism_max_relative_drift\": " << max_drift << ",\n";
+            out << "  \"sampled_vs_full_subgraph_n\": " << k << ",\n";
+            out << "  \"sampled_full_betweenness\": [";
+            for (size_t i = 0; i < bet_full.size(); ++i) out << (i?",":"") << bet_full[i];
+            out << "],\n  \"sampled_betweenness\": [";
+            for (size_t i = 0; i < bet_smp.size(); ++i) out << (i?",":"") << bet_smp[i];
+            out << "]\n}\n";
+            std::cerr << "[diagnostics] done; max OMP drift=" << max_drift
+                      << " over " << k << "-node subgraph." << std::endl;
+        }
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
