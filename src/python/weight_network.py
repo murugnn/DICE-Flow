@@ -89,6 +89,17 @@ class NetworkWeighter:
         logger.info(f"  Min: {network_df['weight'].min():.4f}")
         logger.info(f"  Max: {network_df['weight'].max():.4f}")
 
+        # Collision audit: distinct float weights that collapsed onto the same
+        # integer slot under the chosen scale factor. Higher scale -> fewer
+        # collisions -> more faithful SSSP weights.
+        n_unique_w = network_df['weight'].nunique()
+        n_unique_i = network_df['weight_int'].nunique()
+        collisions = n_unique_w - n_unique_i
+        logger.info(
+            f"scale_factor={self.scale_factor}: weight_int collisions = {collisions} "
+            f"(unique weight={n_unique_w}, unique int={n_unique_i})"
+        )
+
         return network_df[['source', 'target', 'weight', 'weight_int', 'signed_correlation']]
     
     def _load_expression(self) -> pd.DataFrame:
