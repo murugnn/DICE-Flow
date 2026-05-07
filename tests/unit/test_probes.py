@@ -96,3 +96,42 @@ def test_filters_probe_reports_dea_ig_intersection(tmp_path):
     assert m["ig"]["n_genes"] == 3
     assert m["intersection"]["n_genes"] == 2
     assert m["intersection"]["jaccard_dea_ig"] == pytest.approx(0.5)
+
+
+from src.python.diagnostics.probes.weighting import WeightingProbe
+
+
+def test_weighting_probe_explains_edge_loss(tmp_path):
+    merged = tmp_path / "merged.txt"
+    merged.write_text(
+        "source\ttarget\n"
+        "A\tB\n"
+        "A\tZZUNKNOWN\n"   # dropped: target not in expression matrix
+        "C\tD\n"
+        "E\tF\n"
+    )
+    weighted = tmp_path / "weighted.txt"
+    weighted.write_text(
+        "source\ttarget\tweight\tweight_int\n"
+        "A\tB\t0.05\t50\n"
+        "C\tD\t0.000001\t1\n"     # epsilon-clamp survivor
+        "E\tF\t0.5\t500\n"
+    )
+    expr = tmp_path / "expr.tsv"
+    expr.write_text("gene\tS1\tS2\nA\t1\t2\nB\t2\t1\nC\t1\t1\nD\t1\t1\nE\t1\t2\nF\t2\t1\n")
+
+    r = WeightingProbe().run(ctx={
+        "merged_network": str(merged),
+        "weighted_network": str(weighted),
+        "expression": str(expr),
+        "epsilon": 1e-6,
+        "scale_factor": 1000,
+    })
+    m = r.measurements
+    assert m["n_input_edges"] == 4
+    assert m["n_output_edges"] == 3
+    assert m["n_dropped"] == 1
+    assert m["edges_unresolved_in_expression"] == 1
+    assert m["epsilon_clamped_edges"] >= 1
+    # merged net has 7 unique genes (A,B,ZZUNKNOWN,C,D,E,F); expr has 6 -> 6/7
+    assert m["gene_symbol_resolution_rate"] == pytest.approx(6/7)
