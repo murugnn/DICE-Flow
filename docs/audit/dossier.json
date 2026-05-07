@@ -1,0 +1,212 @@
+{
+  "commit": "fe3000e54752b56b22e625729ce0bc6698b0d207",
+  "generated_at": "2026-05-07T11:46:31.465903+00:00",
+  "probes": [
+    {
+      "name": "raw_inputs",
+      "stage": "1-raw-inputs",
+      "duration_s": 0.9065626749998046,
+      "error": null,
+      "measurements": {
+        "expression_normal": {
+          "path": "data/raw/expression/expression_normal.txt",
+          "n_genes": 10868,
+          "n_samples": 52,
+          "nan_cells": 0,
+          "duplicate_genes": 0,
+          "id_type": "symbol"
+        },
+        "expression_tumor": {
+          "path": "data/raw/expression/expression_tumor.txt",
+          "n_genes": 10868,
+          "n_samples": 498,
+          "nan_cells": 0,
+          "duplicate_genes": 0,
+          "id_type": "symbol"
+        },
+        "kegg": {
+          "path": "data/raw/kegg",
+          "n_xml_files": 369
+        }
+      }
+    },
+    {
+      "name": "parsers",
+      "stage": "2-parsers",
+      "duration_s": 1.3471918850000293,
+      "error": null,
+      "measurements": {
+        "kegg": {
+          "path": "data/processed/networks/kegg_interactions.txt",
+          "n_edges": 6222,
+          "duplicate_edges": 0,
+          "unique_genes": 2530,
+          "self_loops": 0
+        },
+        "biogrid": {
+          "path": "data/processed/networks/biogrid_interactions.txt",
+          "n_edges": 983026,
+          "duplicate_edges": 0,
+          "unique_genes": 20361,
+          "self_loops": 0
+        }
+      }
+    },
+    {
+      "name": "merge_networks",
+      "stage": "3-merge",
+      "duration_s": 3.8790376500001003,
+      "error": null,
+      "measurements": {
+        "path": "data/processed/networks/merged_network.txt",
+        "n_edges": 1856918,
+        "n_directed": 6222,
+        "n_undirected": 1850696,
+        "unique_genes": 20487,
+        "bidirectional_pairs": 171,
+        "self_loops": 0
+      }
+    },
+    {
+      "name": "filters",
+      "stage": "4-filters",
+      "duration_s": 0.03191810299995268,
+      "error": null,
+      "measurements": {
+        "dea": {
+          "n_genes_total": 10868,
+          "n_significant": 1269,
+          "fdr_p10": 5.850485381824402e-12,
+          "fdr_p50": 0.0019210140635413,
+          "fdr_p90": 0.6293312584456452,
+          "fdr_le_0_05_pct": 0.6552263525947737,
+          "abs_lfc_gt_1_pct": 0.11676481413323518,
+          "n_genes_listed": 1269
+        },
+        "ig": {
+          "n_genes": 4129
+        },
+        "intersection": {
+          "n_genes": 1165,
+          "n_dea_only": 104,
+          "n_ig_only": 2964,
+          "jaccard_dea_ig": 0.2752185211433971
+        }
+      }
+    },
+    {
+      "name": "weighting",
+      "stage": "5-weighting",
+      "duration_s": 4.879403055999319,
+      "error": null,
+      "measurements": {
+        "n_input_edges": 1856918,
+        "n_output_edges": 490436,
+        "n_dropped": 1366482,
+        "edges_unresolved_in_expression": 1366482,
+        "gene_symbol_resolution_rate": 0.4485771464831356,
+        "epsilon_clamped_edges": 2,
+        "weight_truncation_collisions": 285839,
+        "weight_int_eq_1_count": 2,
+        "weight_distribution": {
+          "min": 1e-06,
+          "max": 1.0,
+          "p10": 0.4712423595553409,
+          "p50": 0.7838027793888763,
+          "p90": 0.9623371360552879
+        }
+      }
+    },
+    {
+      "name": "centrality",
+      "stage": "6-centrality",
+      "duration_s": 0.009530760999950871,
+      "error": null,
+      "measurements": {
+        "omp_determinism_max_relative_drift": 0,
+        "sampled_vs_full_subgraph_n": 1000,
+        "sampled_vs_full_spearman_rho": 0.9314998232474779,
+        "sampled_vs_full_spearman_p": 0.0
+      }
+    },
+    {
+      "name": "differential",
+      "stage": "7-differential",
+      "duration_s": 0.01735330800056545,
+      "error": null,
+      "measurements": {
+        "n_genes": 8960,
+        "bet_eig_rank_correlation": 0.6216578589532712,
+        "top12_eig_dropped_n": 1128,
+        "top12_eig_dropped_genes": [
+          "TNF",
+          "PSME3",
+          "PRKACA",
+          "CTNNB1",
+          "HIF1A",
+          "NTRK1",
+          "SMURF1",
+          "PRNP",
+          "HSPA5",
+          "HTT",
+          "PRKCA",
+          "ILK",
+          "KDM1A",
+          "FGFR1",
+          "CSE1L",
+          "KPNA1",
+          "MTOR",
+          "CTNND1",
+          "SRC",
+          "CDC42",
+          "PIN1",
+          "TUBA1B",
+          "CREBBP",
+          "ACACA",
+          "PTK2",
+          "FYN",
+          "CDK2",
+          "INS",
+          "ARF6",
+          "ARF1",
+          "TRAF6",
+          "JUN",
+          "FAS",
+          "MSN",
+          "LYN",
+          "SMAD2",
+          "FGFR3",
+          "GNAS",
+          "MAPK14",
+          "ESR1",
+          "DAXX",
+          "GRB2",
+          "CYLD",
+          "STAT3",
+          "TBK1",
+          "CALCOCO2",
+          "RAC1",
+          "NCBP1",
+          "UPF1",
+          "PTPN11"
+        ],
+        "top12_eig_dropped_in_cgc": 121,
+        "cgc_size": 685
+      }
+    },
+    {
+      "name": "validation",
+      "stage": "8-validation",
+      "duration_s": 0.006589492000784958,
+      "error": "ParserError: Error tokenizing data. C error: Expected 1 fields in line 8, saw 4\n",
+      "measurements": {}
+    },
+    {
+      "name": "dnf",
+      "stage": "10-dnf",
+      "duration_s": 4.888999683316797e-06,
+      "error": null,
+      "measurements": {}
+    }
+  ]
+}
