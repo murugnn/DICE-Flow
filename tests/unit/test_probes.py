@@ -209,3 +209,27 @@ def test_validation_probe_reports_overlap_and_join_rate(tmp_path):
     assert 0.0 < m["dice_deg_overlap"]["hypergeom_p"] <= 1.0
     assert m["depmap"]["join_match_count"] == 2
     assert m["depmap"]["join_match_rate"] == pytest.approx(0.4)
+
+
+from src.python.diagnostics.probes.dnf import DNFProbe
+
+
+def test_dnf_probe_summarizes_pairs(tmp_path):
+    dnf = tmp_path / "dnf.tsv"
+    dnf.write_text(
+        "gene_a\tgene_b\tDSS\n"
+        "G1\tG2\t0.1\n"
+        "G1\tG3\t0.2\n"
+        "G2\tG3\t-0.05\n"
+    )
+    sl = tmp_path / "sl.tsv"
+    sl.write_text("gene_a\tgene_b\nG1\tG2\n")
+    r = DNFProbe().run(ctx={
+        "dnf_pairwise": str(dnf),
+        "synlethdb": str(sl),
+    })
+    m = r.measurements
+    assert m["n_pairs"] == 3
+    assert m["dss_min"] == pytest.approx(-0.05)
+    assert m["dss_max"] == pytest.approx(0.2)
+    assert m["synlethdb_overlap"] == 1
