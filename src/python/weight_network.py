@@ -156,13 +156,21 @@ def main():
                        help='Gene expression matrix file')
     parser.add_argument('--output', required=True, 
                        help='Output weighted network file')
-    parser.add_argument('--scale', type=int, default=1000,
-                       help='Scale factor for integer weights (default: 1000)')
-    
+    parser.add_argument('--scale-factor', type=int, default=100000,
+                       help='Integer scale factor (default 100000; use 1000 for --dice-faithful)')
+    parser.add_argument('--scale', type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument('--dice-faithful', action='store_true',
+                       help='Use pre-audit defaults: scale=1000, no signed-correlation output')
+
     args = parser.parse_args()
-    
+
+    if args.scale is not None:
+        args.scale_factor = args.scale  # legacy alias
+    if args.dice_faithful:
+        args.scale_factor = 1000
+
     # Weight network
-    weighter = NetworkWeighter(args.network, args.expression, args.scale)
+    weighter = NetworkWeighter(args.network, args.expression, args.scale_factor)
     weighted_df = weighter.weight_network()
     
     # Save

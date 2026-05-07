@@ -216,10 +216,22 @@ int main(int argc, char* argv[]) {
     // appears anywhere after the positional args, emit a small JSON dossier
     // covering OMP determinism + sampled-vs-full Brandes on a sub-induced graph.
     std::string diag_out;
-    for (int i = 4; i < argc - 1; ++i) {
+    std::string brandes_mode = "auto";
+    int scale_factor = 100000;
+    bool dice_faithful = false;
+    for (int i = 4; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "--diagnostics-out") { diag_out = argv[i + 1]; break; }
+        if (a == "--diagnostics-out" && i + 1 < argc) { diag_out = argv[++i]; }
+        else if (a == "--brandes-mode" && i + 1 < argc) { brandes_mode = argv[++i]; }
+        else if (a == "--scale-factor" && i + 1 < argc) { scale_factor = std::stoi(argv[++i]); }
+        else if (a == "--dice-faithful") {
+            dice_faithful = true;
+            brandes_mode = "sampled";
+            scale_factor = 1000;
+        }
     }
+    (void)scale_factor;   // forwarded to engine in Task 2.6
+    (void)dice_faithful;  // wired into mode-switch in Task 2.5
 
     try {
         // --------------------------------------------------------------------

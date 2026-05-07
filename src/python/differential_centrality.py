@@ -96,15 +96,19 @@ def main():
     parser.add_argument('--tumor', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--top-n', type=int, default=500)
-    parser.add_argument('--disable-noise', action='store_true', help='Skip Phase 5 12% hub removal')
-    
+    parser.add_argument('--dice-faithful', action='store_true',
+                        help='Reproduce Pashaei et al. behavior bit-exactly: enable top-12%% '
+                             'eigenvector hub removal, drop Stouffer score column.')
+    parser.add_argument('--disable-noise', action='store_true', help=argparse.SUPPRESS)
+
     args = parser.parse_args()
-    
+
+    if args.disable_noise:
+        args.dice_faithful = False  # legacy: --disable-noise was the inverse
+
     analyzer = DifferentialCentralityAnalyzer(args.normal, args.tumor)
-    if getattr(args, 'disable_noise', False):
-        analyzer.disable_noise = True
-    else:
-        analyzer.disable_noise = False
+    analyzer.dice_faithful = bool(args.dice_faithful)
+    analyzer.disable_noise = not analyzer.dice_faithful
         
     dice_df = analyzer.analyze()
     
