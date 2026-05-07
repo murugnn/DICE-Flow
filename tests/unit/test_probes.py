@@ -1,6 +1,8 @@
 import pandas as pd
+import pytest
 from src.python.diagnostics.probes.raw_inputs import RawInputsProbe
 from src.python.diagnostics.probes.parsers import ParsersProbe
+from src.python.diagnostics.probes.filters import FiltersProbe
 
 
 def test_raw_inputs_probe_counts_rows_and_detects_id_type(
@@ -63,3 +65,34 @@ def test_merge_probe_counts_directed_undirected(tmp_path):
     assert m["n_undirected"] == 2
     assert m["unique_genes"] == 5
     assert m["bidirectional_pairs"] == 1   # A-B has both directions
+
+
+def test_filters_probe_reports_dea_ig_intersection(tmp_path):
+    dea_table = tmp_path / "dea.tsv"
+    dea_table.write_text(
+        "gene\tlog2FC\tpvalue\tFDR\n"
+        "G1\t2.0\t0.001\t0.01\n"
+        "G2\t-2.0\t0.001\t0.01\n"
+        "G3\t0.5\t0.5\t0.5\n"
+        "G4\t3.0\t0.001\t0.01\n"
+    )
+    dea_genes = tmp_path / "dea_genes.txt"
+    dea_genes.write_text("G1\nG2\nG4\n")
+    ig_genes = tmp_path / "ig_genes.txt"
+    ig_genes.write_text("G2\nG4\nG5\n")
+    inter = tmp_path / "candidates.txt"
+    inter.write_text("G2\nG4\n")
+
+    r = FiltersProbe().run(ctx={
+        "dea_table": str(dea_table),
+        "dea_genes": str(dea_genes),
+        "ig_genes": str(ig_genes),
+        "candidates": str(inter),
+    })
+    m = r.measurements
+    assert m["dea"]["n_genes_total"] == 4
+    assert m["dea"]["n_significant"] == 3
+    assert m["dea"]["fdr_p10"] <= m["dea"]["fdr_p90"]
+    assert m["ig"]["n_genes"] == 3
+    assert m["intersection"]["n_genes"] == 2
+    assert m["intersection"]["jaccard_dea_ig"] == pytest.approx(0.5)
