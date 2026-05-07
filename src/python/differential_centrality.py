@@ -9,6 +9,7 @@ import numpy as np
 import logging
 from pathlib import Path
 import argparse
+from scipy.stats import norm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,6 +33,15 @@ class DifferentialCentralityAnalyzer:
         merged['diff_eigenvector'] = (merged['eigenvector_tumor'] - merged['eigenvector_norm']).abs()
         merged['rank_bet'] = merged['diff_betweenness'].rank(pct=True)
         merged['rank_eig'] = merged['diff_eigenvector'].rank(pct=True)
+
+        # Stouffer combined score: rank-percentiles -> z-scores -> sum/sqrt(2).
+        # Decorrelated alternative to rank-product (which double-counts when
+        # betweenness and eigenvector are correlated, as they typically are).
+        # Clip away from {0, 1} since norm.ppf maps them to +/-infinity.
+        eps = 1e-6
+        z_bet = norm.ppf(merged['rank_bet'].clip(eps, 1 - eps))
+        z_eig = norm.ppf(merged['rank_eig'].clip(eps, 1 - eps))
+        merged['ensemble_score_stouffer'] = (z_bet + z_eig) / (2 ** 0.5)
 
         # Always compute the raw ensemble (no hub filtering)
         merged['ensemble_score_raw'] = merged['rank_bet'] * merged['rank_eig']
