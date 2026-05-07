@@ -9,6 +9,7 @@ import numpy as np
 import logging
 from pathlib import Path
 import argparse
+from scipy.stats import norm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,69 +27,66 @@ class DifferentialCentralityAnalyzer:
         except Exception as e:
             logger.error(f"Error reading files: {e}")
             return pd.DataFrame()
-        
-        # Merge
+
         merged = pd.merge(normal_df, tumor_df, on='gene', suffixes=('_norm', '_tumor'))
-        
-        # 1. Calculate Absolute Differences (DiCE Metric)
-        # We care about magnitude of change, whether up or down
         merged['diff_betweenness'] = (merged['betweenness_tumor'] - merged['betweenness_norm']).abs()
         merged['diff_eigenvector'] = (merged['eigenvector_tumor'] - merged['eigenvector_norm']).abs()
-        
-        # 2. Ranking (0 to 1)
-        # Rank the differences. pct=True gives a score 0.0 to 1.0
         merged['rank_bet'] = merged['diff_betweenness'].rank(pct=True)
         merged['rank_eig'] = merged['diff_eigenvector'].rank(pct=True)
-        
-        # 3. Ensemble Score (Product of Ranks)
-        # This penalizes genes that only change in one metric but not the other
-        merged['ensemble_score'] = merged['rank_bet'] * merged['rank_eig']
-        
-        # 4. Filter Noise (Phase V Filtering)
-        # 4a. Remove extreme high-eigenvector nodes (Top 12%)
-        # The paper explicitly notes these represent dense, non-differential 
-        # noise clusters (housekeeping core) and must be removed.
-        eig_threshold_norm = merged['eigenvector_norm'].quantile(0.88)  # Bottom 88%
-        eig_threshold_tumor = merged['eigenvector_tumor'].quantile(0.88)
-        
-        mask_not_hub = (merged['eigenvector_norm'] <= eig_threshold_norm) & \
-                       (merged['eigenvector_tumor'] <= eig_threshold_tumor)
 
-        # 4b. Remove extreme low-betweenness nodes (Peripheral Noise)
-        # Exclude genes that have very low centrality in BOTH conditions
-        # (They are peripheral in both networks, changes are likely noise)
-        avg_bet_norm = merged['betweenness_norm'].mean()
-        avg_bet_tumor = merged['betweenness_tumor'].mean()
-        
-        # Keep if gene is above average in AT LEAST one condition
-        mask_not_periph = (merged['betweenness_norm'] > avg_bet_norm) | \
-                          (merged['betweenness_tumor'] > avg_bet_tumor)
-               
-        # Apply combined strict filtering mask
-        if getattr(self, 'disable_noise', False):
-            filtered_df = merged.copy()
-            logger.info("NOISE FILTER DISABLED: Retaining ultra-hubs like EP300 and peripheral nodes.")
+        # Stouffer combined score: rank-percentiles -> z-scores -> sum/sqrt(2).
+        # Decorrelated alternative to rank-product (which double-counts when
+        # betweenness and eigenvector are correlated, as they typically are).
+        # Clip away from {0, 1} since norm.ppf maps them to +/-infinity.
+        eps = 1e-6
+        z_bet = norm.ppf(merged['rank_bet'].clip(eps, 1 - eps))
+        z_eig = norm.ppf(merged['rank_eig'].clip(eps, 1 - eps))
+        merged['ensemble_score_stouffer'] = (z_bet + z_eig) / (2 ** 0.5)
+
+        # Always compute the raw ensemble (no hub filtering)
+        merged['ensemble_score_raw'] = merged['rank_bet'] * merged['rank_eig']
+
+        # Hub-corrected: same score but applied AFTER dropping top-12% eigenvector
+        # AND keeping genes above-average betweenness in at least one condition.
+        eig_n = merged['eigenvector_norm'].quantile(0.88)
+        eig_t = merged['eigenvector_tumor'].quantile(0.88)
+        avg_bet_n = merged['betweenness_norm'].mean()
+        avg_bet_t = merged['betweenness_tumor'].mean()
+        mask_keep = ((merged['eigenvector_norm'] <= eig_n) & (merged['eigenvector_tumor'] <= eig_t)) & \
+                    ((merged['betweenness_norm'] > avg_bet_n) | (merged['betweenness_tumor'] > avg_bet_t))
+
+        hub_df = merged[mask_keep].copy()
+        hub_df['ensemble_score_hub_corrected'] = hub_df['rank_bet'] * hub_df['rank_eig']
+        merged = merged.merge(
+            hub_df[['gene', 'ensemble_score_hub_corrected']],
+            on='gene', how='left'
+        )
+
+        if getattr(self, 'dice_faithful', False):
+            out = hub_df.copy()
+            out['ensemble_score'] = out['ensemble_score_hub_corrected']
+            out = out.drop(columns=['ensemble_score_hub_corrected'])
+            out = out.sort_values('ensemble_score', ascending=False).copy()
+            logger.warning(
+                "--dice-faithful: dropped %d top-12%% eigenvector hubs (incl. potentially TP53/EP300)",
+                len(merged) - len(out),
+            )
         else:
-            filtered_df = merged[mask_not_hub & mask_not_periph].copy()
-            
-            logger.info(f"Filtering: Started with {len(merged)} genes.")
-            logger.info(f"  - Removed {len(merged) - mask_not_hub.sum()} high-eigenvector noise genes")
-            logger.info(f"  - Removed {len(merged) - mask_not_periph.sum()} low-betweenness peripheral genes")
-            logger.info(f"  - Final retained pool: {len(filtered_df)} genes")
-        
-        # 5. Sort by Ensemble Score (Descending)
-        filtered_df = filtered_df.sort_values('ensemble_score', ascending=False)
-        
-        # Add rank column (1 = top gene)
-        filtered_df['final_rank'] = range(1, len(filtered_df) + 1)
+            out = merged.sort_values('ensemble_score_raw', ascending=False).copy()
+            logger.info(
+                "Default mode: kept all %d genes; reporting raw and hub-corrected scores",
+                len(out),
+            )
 
-        # Add delta columns for visualization (keep sign here to show up/down)
-        filtered_df['delta_betweenness'] = filtered_df['betweenness_tumor'] - filtered_df['betweenness_norm']
-        filtered_df['delta_eigenvector'] = filtered_df['eigenvector_tumor'] - filtered_df['eigenvector_norm']
+        out['final_rank'] = range(1, len(out) + 1)
+        out['delta_betweenness'] = out['betweenness_tumor'] - out['betweenness_norm']
+        out['delta_eigenvector'] = out['eigenvector_tumor'] - out['eigenvector_norm']
 
-        logger.info(f"Ranking complete. Top gene: {filtered_df.iloc[0]['gene']} (Score: {filtered_df.iloc[0]['ensemble_score']:.4f})")
-        
-        return filtered_df
+        score_col = 'ensemble_score' if getattr(self, 'dice_faithful', False) else 'ensemble_score_raw'
+        logger.info("Ranking complete. Top gene: %s (Score: %.4f)",
+                    out.iloc[0]['gene'], out.iloc[0][score_col])
+
+        return out
 
 def main():
     parser = argparse.ArgumentParser()
@@ -96,15 +94,18 @@ def main():
     parser.add_argument('--tumor', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--top-n', type=int, default=500)
-    parser.add_argument('--disable-noise', action='store_true', help='Skip Phase 5 12% hub removal')
-    
+    parser.add_argument('--dice-faithful', action='store_true',
+                        help='Reproduce Pashaei et al. behavior bit-exactly: enable top-12%% '
+                             'eigenvector hub removal, drop Stouffer score column.')
+    parser.add_argument('--disable-noise', action='store_true', help=argparse.SUPPRESS)
+
     args = parser.parse_args()
-    
+
+    if args.disable_noise:
+        args.dice_faithful = False  # legacy: --disable-noise was the inverse
+
     analyzer = DifferentialCentralityAnalyzer(args.normal, args.tumor)
-    if getattr(args, 'disable_noise', False):
-        analyzer.disable_noise = True
-    else:
-        analyzer.disable_noise = False
+    analyzer.dice_faithful = bool(args.dice_faithful)
         
     dice_df = analyzer.analyze()
     

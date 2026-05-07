@@ -440,6 +440,38 @@ public:
         return compute_betweenness_from_sources(sources);
     }
 
+    // Bootstrap-CI for sampled Brandes: B independent sampled runs (each with
+    // a perturbed seed), then per-vertex 95% CI from the 2.5/97.5 quantiles
+    // and median as point estimate. Used in --brandes-mode=bootstrap.
+    struct BrandesCI {
+        std::vector<double> point;
+        std::vector<double> ci_lo;
+        std::vector<double> ci_hi;
+    };
+
+    BrandesCI brandes_with_ci(double sample_rate, int B, uint64_t seed) {
+        int n = graph.n_vertices;
+        std::vector<std::vector<double>> samples(n);
+        for (auto& v : samples) v.reserve(B);
+
+        for (int b = 0; b < B; ++b) {
+            auto bet = compute_betweenness(sample_rate, seed + (uint64_t)b);
+            for (int v = 0; v < n; ++v) samples[v].push_back(bet[v]);
+        }
+
+        BrandesCI out;
+        out.point.resize(n);
+        out.ci_lo.resize(n);
+        out.ci_hi.resize(n);
+        for (int v = 0; v < n; ++v) {
+            std::sort(samples[v].begin(), samples[v].end());
+            out.point[v] = samples[v][B / 2];
+            out.ci_lo[v] = samples[v][std::max(0, int(B * 0.025))];
+            out.ci_hi[v] = samples[v][std::min(B - 1, int(B * 0.975))];
+        }
+        return out;
+    }
+
     std::vector<double> compute_eigenvector_weighted() {
         int n = graph.n_vertices;
         std::vector<double> v(n, 1.0 / std::sqrt(n));

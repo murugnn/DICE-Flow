@@ -60,6 +60,9 @@ MODE="full"  # full, test, or custom
 USE_DUMMY=false
 SKIP_BUILD=false
 GLOBAL_MODE=0
+DICE_FAITHFUL=""
+SCALE_FACTOR=100000
+BRANDES_MODE="auto"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -76,14 +79,31 @@ while [[ $# -gt 0 ]]; do
             SKIP_BUILD=true
             shift
             ;;
+        --dice-faithful)
+            DICE_FAITHFUL="--dice-faithful"
+            SCALE_FACTOR=1000
+            BRANDES_MODE="sampled"
+            shift
+            ;;
+        --scale-factor)
+            SCALE_FACTOR="$2"
+            shift 2
+            ;;
+        --brandes-mode)
+            BRANDES_MODE="$2"
+            shift 2
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --test          Run with dummy data"
-            echo "  --global        Run on full interactome (skip filtering)"
-            echo "  --skip-build    Skip C++ compilation"
-            echo "  --help          Show this help message"
+            echo "  --test                Run with dummy data"
+            echo "  --global              Run on full interactome (skip filtering)"
+            echo "  --skip-build          Skip C++ compilation"
+            echo "  --dice-faithful       Reproduce Pashaei et al. defaults (scale=1000, sampled Brandes, hub removal)"
+            echo "  --scale-factor N      Integer scale factor for weight_int (default 100000)"
+            echo "  --brandes-mode MODE   auto | full | bootstrap | sampled (default auto)"
+            echo "  --help                Show this help message"
             exit 0
             ;;
         *)
@@ -246,7 +266,7 @@ $PYTHON src/python/weight_network.py \
     --network "$MERGED_NETWORK" \
     --expression "$NORMAL_EXPR" \
     --output "$NORMAL_WEIGHTED" \
-    --scale 1000
+    --scale-factor "$SCALE_FACTOR" $DICE_FAITHFUL
 
 # Step 2.2: Weight network with tumor expression
 log_info "Weighting network with tumor expression..."
@@ -256,7 +276,7 @@ $PYTHON src/python/weight_network.py \
     --network "$MERGED_NETWORK" \
     --expression "$TUMOR_EXPR" \
     --output "$TUMOR_WEIGHTED" \
-    --scale 1000
+    --scale-factor "$SCALE_FACTOR" $DICE_FAITHFUL
 
 # ============================================================================
 # Phase 5: Centrality Computation (C++ Engine)
@@ -277,7 +297,11 @@ log_info "Running Duan 2025 algorithm on normal and tumor networks..."
 $CPP_BIN \
     "$NORMAL_INT" \
     "$TUMOR_INT" \
-    "$RESULTS_DIR"
+    "$RESULTS_DIR" \
+    "full" \
+    "" \
+    --brandes-mode "$BRANDES_MODE" \
+    --scale-factor "$SCALE_FACTOR" $DICE_FAITHFUL
 
 if [ $? -ne 0 ]; then
     log_error "C++ analysis failed"
@@ -314,7 +338,7 @@ else
         --normal "$NORMAL_CENTRALITY" \
         --tumor "$TUMOR_CENTRALITY" \
         --output "$DICE_GENES" \
-        --top-n 500
+        --top-n 500 $DICE_FAITHFUL
 fi
 
 if [ ! -f "$DICE_GENES" ]; then

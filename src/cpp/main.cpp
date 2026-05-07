@@ -87,15 +87,37 @@ public:
     DiCEAnalyzer(const Graph<WeightType>& g, const std::string& name)
         : graph(g), graph_name(name) {}
 
-    void compute_all_centralities(const std::string& output_file) {
+    void compute_all_centralities(const std::string& output_file,
+                                  const std::string& brandes_mode = "auto",
+                                  const std::string& ci_out_dir = "") {
         std::cout << "\n=== Computing Centralities for " << graph_name << " ===" << std::endl;
-        
+
         // Uses the BaseRadixHeap inside CentralityCalculator for speed
         CentralityCalculator<WeightType> calc(graph);
-        
-        std::cout << "Computing betweenness centrality..." << std::endl;
-        auto betweenness = calc.compute_betweenness();
-        
+
+        std::cout << "Computing betweenness centrality (mode=" << brandes_mode << ")..." << std::endl;
+        std::vector<double> betweenness;
+        const int n = graph.n_vertices;
+        if (brandes_mode == "full" || (brandes_mode == "auto" && n < 5000)) {
+            betweenness = calc.compute_betweenness(1.0, /*seed=*/42);
+        } else if (brandes_mode == "bootstrap") {
+            auto r = calc.brandes_with_ci(/*sample_rate=*/0.1, /*B=*/20, /*seed=*/42);
+            if (!ci_out_dir.empty()) {
+                std::string tag = graph_name;
+                std::transform(tag.begin(), tag.end(), tag.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
+                std::ofstream lo(ci_out_dir + "/centrality_" + tag + "_ci_lo.txt");
+                std::ofstream hi(ci_out_dir + "/centrality_" + tag + "_ci_hi.txt");
+                for (int v = 0; v < n; ++v) {
+                    lo << graph.id_to_name[v] << "\t" << r.ci_lo[v] << "\n";
+                    hi << graph.id_to_name[v] << "\t" << r.ci_hi[v] << "\n";
+                }
+            }
+            betweenness = std::move(r.point);
+        } else {  // "sampled" — DiCE-faithful path
+            betweenness = calc.compute_betweenness(/*sample_rate=*/0.01, /*seed=*/42);
+        }
+
         std::cout << "Computing eigenvector centrality..." << std::endl;
         auto eigenvector = calc.compute_eigenvector_weighted();
 
@@ -216,10 +238,22 @@ int main(int argc, char* argv[]) {
     // appears anywhere after the positional args, emit a small JSON dossier
     // covering OMP determinism + sampled-vs-full Brandes on a sub-induced graph.
     std::string diag_out;
-    for (int i = 4; i < argc - 1; ++i) {
+    std::string brandes_mode = "auto";
+    int scale_factor = 100000;
+    bool dice_faithful = false;
+    for (int i = 4; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "--diagnostics-out") { diag_out = argv[i + 1]; break; }
+        if (a == "--diagnostics-out" && i + 1 < argc) { diag_out = argv[++i]; }
+        else if (a == "--brandes-mode" && i + 1 < argc) { brandes_mode = argv[++i]; }
+        else if (a == "--scale-factor" && i + 1 < argc) { scale_factor = std::stoi(argv[++i]); }
+        else if (a == "--dice-faithful") {
+            dice_faithful = true;
+            brandes_mode = "sampled";
+            scale_factor = 1000;
+        }
     }
+    (void)scale_factor;   // forwarded to engine in Task 2.6
+    (void)dice_faithful;  // wired into mode-switch in Task 2.5
 
     try {
         // --------------------------------------------------------------------
@@ -280,11 +314,13 @@ int main(int argc, char* argv[]) {
 
         // Analyze Normal
         DiCEAnalyzer<long long> normal_analyzer(normal_graph, "Normal");
-        normal_analyzer.compute_all_centralities(output_dir + "/centrality_normal.txt");
+        normal_analyzer.compute_all_centralities(output_dir + "/centrality_normal.txt",
+                                                  brandes_mode, output_dir);
 
         // Analyze Tumor
         DiCEAnalyzer<long long> tumor_analyzer(tumor_graph, "Tumor");
-        tumor_analyzer.compute_all_centralities(output_dir + "/centrality_tumor.txt");
+        tumor_analyzer.compute_all_centralities(output_dir + "/centrality_tumor.txt",
+                                                 brandes_mode, output_dir);
 
         // Optional: Knockout Analysis
         if (!gene_list.empty() && !tumor_graph.id_to_name.empty()) {

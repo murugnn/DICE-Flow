@@ -58,35 +58,49 @@ class NetworkWeighter:
         logger.info(f"Filtered to {len(network_df)} edges with expression data "
                    f"({initial_count - len(network_df)} removed)")
         
-        # Calculate weights
+        # Calculate weights + signed correlations
         logger.info("Calculating edge weights...")
         weights = []
-        
+        signed = []
+
         for idx, row in network_df.iterrows():
             if idx % 10000 == 0:
                 logger.info(f"Processed {idx}/{len(network_df)} edges")
-            
+
             source = row['source']
             target = row['target']
-            
-            weight = self._calculate_weight(expr_df, source, target)
-            weights.append(weight)
-        
+
+            w, c = self._calculate_weight(expr_df, source, target)
+            weights.append(w)
+            signed.append(c)
+
         network_df['weight'] = weights
-        
+        network_df['signed_correlation'] = signed
+
         # Convert to integers for Duan algorithm
         network_df['weight_int'] = (network_df['weight'] * self.scale_factor).astype(int)
-        
+
         # Ensure no zero weights
         network_df.loc[network_df['weight_int'] == 0, 'weight_int'] = 1
-        
+
         logger.info(f"Weight statistics:")
         logger.info(f"  Mean: {network_df['weight'].mean():.4f}")
         logger.info(f"  Std: {network_df['weight'].std():.4f}")
         logger.info(f"  Min: {network_df['weight'].min():.4f}")
         logger.info(f"  Max: {network_df['weight'].max():.4f}")
-        
-        return network_df[['source', 'target', 'weight', 'weight_int']]
+
+        # Collision audit: distinct float weights that collapsed onto the same
+        # integer slot under the chosen scale factor. Higher scale -> fewer
+        # collisions -> more faithful SSSP weights.
+        n_unique_w = network_df['weight'].nunique()
+        n_unique_i = network_df['weight_int'].nunique()
+        collisions = n_unique_w - n_unique_i
+        logger.info(
+            f"scale_factor={self.scale_factor}: weight_int collisions = {collisions} "
+            f"(unique weight={n_unique_w}, unique int={n_unique_i})"
+        )
+
+        return network_df[['source', 'target', 'weight', 'weight_int', 'signed_correlation']]
     
     def _load_expression(self) -> pd.DataFrame:
         """Load expression matrix"""
@@ -111,37 +125,31 @@ class NetworkWeighter:
         
         return df
     
-    def _calculate_weight(self, expr_df: pd.DataFrame, 
-                         gene1: str, gene2: str) -> float:
+    def _calculate_weight(self, expr_df: pd.DataFrame,
+                         gene1: str, gene2: str) -> Tuple[float, float]:
         """
-        Calculate DiCE weight: 1 - |Pearson correlation|
-        
-        High correlation -> Low weight (short distance)
-        Low correlation -> High weight (long distance)
+        Calculate DiCE |r|-distance weight AND signed Pearson correlation.
+
+        High |r| -> Low weight (short distance) — used for SSSP.
+        Sign of r -> reported separately so downstream analysis can
+        distinguish coactivation (r>0) from antagonism (r<0).
         """
-        
+
         try:
             expr1 = expr_df.loc[gene1].values
             expr2 = expr_df.loc[gene2].values
-            
-            # Calculate Pearson correlation
+
             corr, _ = pearsonr(expr1, expr2)
-            
-            # Handle NaN correlations
+
             if np.isnan(corr):
                 corr = 0.0
-            
-            # DiCE formula: Weight = 1 - |r|
-            weight = 1.0 - abs(corr)
-            
-            # Add epsilon to avoid zero weights
-            weight = max(weight, self.epsilon)
-            
-            return weight
-            
+
+            weight = max(1.0 - abs(corr), self.epsilon)
+            return weight, float(corr)
+
         except Exception as e:
             logger.warning(f"Error calculating weight for {gene1}-{gene2}: {e}")
-            return 1.0  # Default weight
+            return 1.0, 0.0
 
 
 def main():
@@ -156,25 +164,43 @@ def main():
                        help='Gene expression matrix file')
     parser.add_argument('--output', required=True, 
                        help='Output weighted network file')
-    parser.add_argument('--scale', type=int, default=1000,
-                       help='Scale factor for integer weights (default: 1000)')
-    
+    parser.add_argument('--scale-factor', type=int, default=100000,
+                       help='Integer scale factor (default 100000; use 1000 for --dice-faithful)')
+    parser.add_argument('--scale', type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument('--dice-faithful', action='store_true',
+                       help='Use pre-audit defaults: scale=1000, no signed-correlation output')
+
     args = parser.parse_args()
-    
+
+    if args.scale is not None:
+        args.scale_factor = args.scale  # legacy alias
+    if args.dice_faithful:
+        args.scale_factor = 1000
+
     # Weight network
-    weighter = NetworkWeighter(args.network, args.expression, args.scale)
+    weighter = NetworkWeighter(args.network, args.expression, args.scale_factor)
     weighted_df = weighter.weight_network()
-    
-    # Save
-    weighted_df.to_csv(args.output, index=False, sep='\t')
+
+    # Save main output (omit signed_correlation from the primary file —
+    # legacy consumers don't expect it; emit a side file instead).
+    main_cols = ['source', 'target', 'weight', 'weight_int']
+    weighted_df[main_cols].to_csv(args.output, index=False, sep='\t')
     logger.info(f"Saved weighted network to {args.output}")
-    
+
     # Also save integer-only version for C++ engine
     int_output = args.output.replace('.txt', '_int.txt')
     weighted_df[['source', 'target', 'weight_int']].to_csv(
         int_output, index=False, sep='\t', header=False
     )
     logger.info(f"Saved integer-weighted network to {int_output}")
+
+    # Emit signed-correlation side file unless --dice-faithful suppresses it.
+    if not args.dice_faithful:
+        signed_path = args.output.replace('.txt', '_signed.tsv')
+        weighted_df[['source', 'target', 'signed_correlation']].to_csv(
+            signed_path, index=False, sep='\t'
+        )
+        logger.info(f"Saved signed-correlation matrix to {signed_path}")
 
 
 if __name__ == '__main__':
