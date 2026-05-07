@@ -18,13 +18,29 @@ endif()
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/cpp)
 
+# OpenMP (engine.hpp uses omp pragmas / omp.h)
+find_package(OpenMP)
+
 # Main executable
 add_executable(dice_analyzer
     src/cpp/main.cpp
 )
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(dice_analyzer PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 # Installation
 install(TARGETS dice_analyzer DESTINATION bin)
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ flags: ${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}}")
+
+# ============================================================================
+# Tests
+# ============================================================================
+enable_testing()
+add_executable(test_engine src/cpp/tests/test_engine.cpp)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(test_engine PUBLIC OpenMP::OpenMP_CXX)
+endif()
+add_test(NAME engine_tests COMMAND test_engine)

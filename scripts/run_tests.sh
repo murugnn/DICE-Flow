@@ -2,8 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+PY="${PYTHON:-/home/cerelac/DICE/venv/bin/python}"
+
 echo "== Python tests =="
-python -m pytest tests/unit tests/integration tests/regression tests/bugs
+"$PY" -m pytest tests/unit tests/integration tests/regression tests/bugs
 
 echo "== C++ tests =="
 if [[ -x build/test_engine ]]; then
