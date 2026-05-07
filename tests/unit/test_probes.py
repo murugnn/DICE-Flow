@@ -153,3 +153,36 @@ def test_centrality_probe_computes_spearman(tmp_path):
     m = r.measurements
     assert m["omp_determinism_max_relative_drift"] == 0.0
     assert m["sampled_vs_full_spearman_rho"] == pytest.approx(1.0)
+
+
+from pathlib import Path
+from src.python.diagnostics.probes.differential import DifferentialProbe
+
+CGC = Path(__file__).parents[1] / "fixtures" / "cgc_mini.txt"
+
+
+def test_differential_probe_finds_hub_kills(tmp_path):
+    centrality_normal = tmp_path / "cn.txt"
+    centrality_normal.write_text(
+        "gene\tbetweenness\teigenvector\n"
+        + "\n".join(f"G{i}\t{i}\t{0.01*i}" for i in range(100)) + "\n"
+        + "TP53\t10\t0.99\nEP300\t12\t0.95\n"
+    )
+    centrality_tumor = tmp_path / "ct.txt"
+    centrality_tumor.write_text(
+        "gene\tbetweenness\teigenvector\n"
+        + "\n".join(f"G{i}\t{i+1}\t{0.01*i}" for i in range(100)) + "\n"
+        + "TP53\t9\t0.97\nEP300\t11\t0.93\n"
+    )
+    r = DifferentialProbe().run(ctx={
+        "centrality_normal": str(centrality_normal),
+        "centrality_tumor": str(centrality_tumor),
+        "cgc_list": str(CGC),
+    })
+    m = r.measurements
+    # bet/eig rank correlation defined and bounded
+    assert -1.0 <= m["bet_eig_rank_correlation"] <= 1.0
+    # TP53 + EP300 are in the top-12% of eigenvector and in CGC
+    assert "TP53" in m["top12_eig_dropped_genes"]
+    assert "EP300" in m["top12_eig_dropped_genes"]
+    assert m["top12_eig_dropped_in_cgc"] >= 2
