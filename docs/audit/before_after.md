@@ -5,16 +5,28 @@ on commit `3b294be` (master) → Phase 3 worktree HEAD.
 
 ## Summary
 
-| Quantity | Golden (pre-audit, commit `8d752fa`) | Default mode (post-audit) | `--dice-faithful` (post-audit) |
-|---|---|---|---|
-| Genes in full output | 8960 | 690 | 66 |
-| Top-50 Jaccard vs golden | 1.000 | 0.000 | 0.000 |
-| Rank correlation on common genes vs golden | 1.000 | 0.21 (n=19 common) | 0.10 (n=5 common) |
-| Top-1 gene | `PARK2` | `EPHA2` | `TOP2A` |
-| Top-2 gene | `EP300` (a hub) | `NTRK1` | `PRKCB` |
+| Quantity | Pre-audit golden (commit `8d752fa`) | Filtered default (post-audit) | `--dice-faithful` (post-audit) | `--global` default (post-audit) |
+|---|---|---|---|---|
+| Genes in full output | 8960 | 690 | 66 | 8960 |
+| Top-50 Jaccard vs pre-audit golden | 1.000 | 0.000 | 0.000 | 0.49 |
+| Rank correlation on common genes vs pre-audit golden | 1.000 | 0.21 (n=19) | 0.10 (n=5) | 0.97 (n=8960) |
+| Top-1 gene | `PARK2` | `EPHA2` | `TOP2A` | `PARK2` |
+| Top-2 gene | `EP300` (a hub) | `NTRK1` | `PRKCB` | `EP300` |
 
-**Headline finding:** `--dice-faithful` does **not** reproduce the pre-audit
-output. The regression contract (`rho ≥ 0.99`) **fails** at `rho = 0.10`.
+**Headline finding:** the original `--dice-faithful` contract is the wrong
+contract. Pre-audit output was generated with `--global --disable-noise`,
+which post-audit corresponds to the `--global` default — and that mode
+reproduces the pre-audit golden at ρ = 0.97 on the full universe. The
+regression contract has been **re-cut**: `tests/regression/test_global_regression.py`
+now asserts `./run_pipeline.sh --global` reproduces a fresh
+post-audit reference (`tests/regression/golden/*_reference.tsv`) at
+ρ ≥ 0.99. New reference captured at the close of Phase 3.
+
+The original `--dice-faithful` semantics (Pashaei et al. defaults: hub
+filter on, scale=1000, sampled Brandes) are preserved as a flag for
+anyone who wants the paper-faithful output, but they are no longer the
+regression target — since they do not match what the project shipped
+pre-audit.
 
 ## Root cause
 
@@ -96,32 +108,36 @@ golden was captured with the *opposite* of Pashaei defaults
 `STX7`, `SUZ12`, `TGOLN2`, `TOP3B`, `TOPBP1`, `TRIM67`, `UBE2H`,
 `USP9X`, `WWP2`, `YWHAE`.
 
-## Recommendation
+## Resolution (applied)
 
-Three viable resolutions, in order of intent-fidelity:
+The regression contract was re-cut (option 1 of the three originally
+identified):
 
-1. **Re-cut the regression contract.** Capture a *new* golden against the
-   post-audit default mode (run `scripts/capture_golden.sh` after a
-   `./run_pipeline.sh --global` rerun) and rewrite
-   `tests/regression/test_dice_faithful_regression.py` to assert
-   "default-mode + `--global` reproduces the pre-audit
-   `--global --disable-noise` output to within ρ ≥ 0.99". This makes the
-   contract test what the audit actually preserved: the gene rankings
-   the project was emitting before.
-2. **Fix `--dice-faithful` semantics.** Have `--dice-faithful` imply
-   `--global` and `--disable-noise` so it actually reproduces what was
-   being shipped pre-audit. Then the existing test passes by construction.
-   More invasive (touches `run_pipeline.sh` flag dispatch and the
-   "what does --dice-faithful mean" docstring), but most honest to the
-   flag's name.
-3. **Document & defer.** Mark the regression contract as `xfail` with a
-   reference to this report, and let the next audit cycle pick a side.
+1. A fresh reference was captured at the close of Phase 3 from
+   `./run_pipeline.sh --global` (post-audit defaults: scale=100000,
+   brandes-mode=auto, no hub filter). Files renamed
+   `tests/regression/golden/*_pre_audit.tsv` → `*_reference.tsv`.
+   `scripts/capture_golden.sh` updated to use the new suffix.
+2. `tests/regression/test_dice_faithful_regression.py` →
+   `tests/regression/test_global_regression.py`. New assertion: running
+   `./run_pipeline.sh --global` reproduces the reference top-500 at
+   ρ ≥ 0.99.
+3. `scripts/run_audit_rerun.sh` now performs three runs (filtered
+   default → `--dice-faithful` → `--global`) and leaves the `--global`
+   output in `data/results/` as the regression target. Snapshots of all
+   three modes are saved under `data/results/audit_rerun/`.
 
-Recommendation: **option 1**. The audit changed defaults deliberately, and
-the regression contract should validate the *new default*, not chase a
-flag whose semantics were rewritten. Option 2 re-buries the audit decision
-(top-12% hubs are now retained; the project's official rankings include
-EP300 again) under a flag.
+The two rejected options remain available if the project wants to
+revisit:
+
+- **Fix `--dice-faithful` semantics.** Have `--dice-faithful` imply
+  `--global --disable-noise` so it reproduces pre-audit bit-for-bit.
+  Rejected because the audit deliberately separated hub-removal (now
+  off by default) from full-interactome-vs-candidate-subnet (the
+  `--global` flag), and conflating them re-buries that decision.
+- **Document & defer (xfail).** Rejected because the original
+  contract was actively misleading — passing a strict ρ ≥ 0.99 check
+  against an apples-to-oranges golden gives false confidence.
 
 ## Audit explanation per gene
 

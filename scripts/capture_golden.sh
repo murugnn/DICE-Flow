@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Snapshot current pipeline outputs as golden references for the
-# --dice-faithful regression contract. Run BEFORE any code change.
+# regression contract (post-audit: default + --global must reproduce
+# these). Run after a deliberate, vetted pipeline change to update
+# the reference.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,7 +17,7 @@ for f in \
     data/results/knockout_analysis.txt \
     data/results/dnf_pairwise_results.txt; do
     if [[ -f "$f" ]]; then
-        cp "$f" "$DEST/$(basename ${f%.txt})_pre_audit.tsv"
+        cp "$f" "$DEST/$(basename ${f%.txt})_reference.tsv"
         echo "captured $f"
     else
         echo "missing $f (skipped)"

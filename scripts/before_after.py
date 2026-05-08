@@ -38,7 +38,7 @@ def main():
     g = Path(args.golden)
     n = Path(args.new)
     out = Path(args.out)
-    rep = compare_dice_genes(str(g / "dice_genes_pre_audit.tsv"), str(n / "dice_genes.txt"))
+    rep = compare_dice_genes(str(g / "dice_genes_reference.tsv"), str(n / "dice_genes.txt"))
 
     md = [
         "# Before / After — Audit re-run", "",
