@@ -431,8 +431,12 @@ echo "==================="
 
 # Python one-liner to safely print the correct columns by name
 $PYTHON -c "
-import pandas as pd; 
-df = pd.read_csv('$RESULTS_DIR/dice_genes_top500.txt', sep='\t'); 
-print(df[['gene', 'ensemble_score']].head(10).to_string(index=False))
+import pandas as pd
+df = pd.read_csv('$RESULTS_DIR/dice_genes_top500.txt', sep='\t')
+score_col = next((c for c in ('ensemble_score', 'ensemble_score_raw', 'ensemble_score_hub_corrected') if c in df.columns), None)
+if score_col is None:
+    print(df[['gene']].head(10).to_string(index=False))
+else:
+    print(df[['gene', score_col]].head(10).to_string(index=False))
 "
 echo ""
