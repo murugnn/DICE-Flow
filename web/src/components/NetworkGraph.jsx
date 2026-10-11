@@ -28,7 +28,7 @@ const NetworkGraph = ({
     if (!containerRef.current || cyRef.current || !networkData) return;
 
     const nodeColor = tissue === 'normal' ? '#00F0FF' : '#FF2D8D';
-    const edgeColor = tissue === 'normal' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 45, 141, 0.25)';
+    const edgeColor = tissue === 'normal' ? '#00F0FF' : '#FF2D8D';
 
     // Prepare elements from API data
     const elements = [
@@ -80,7 +80,7 @@ const NetworkGraph = ({
               }
               const l2fc = ele.data('log2fc');
               if (l2fc !== undefined && l2fc !== 0) {
-                return l2fc > 0 ? '#EF4444' : '#3B82F6'; // TailWind Red-500 or Blue-500
+                return l2fc > 0 ? '#FF3B5C' : '#3B82F6'; // TailWind Red/Blue, slightly softer red
               }
               return nodeColor;
             },
@@ -92,21 +92,20 @@ const NetworkGraph = ({
             'font-family': 'JetBrains Mono, monospace',
             'text-valign': 'bottom',
             'text-halign': 'center',
-            'text-margin-y': 6,
+            'text-margin-y': 4,
             'text-background-color': '#0A0A0A',
-            'text-background-opacity': 0.8,
+            'text-background-opacity': 0.6, // Transparent background for text so graph isn't obscured
             'text-background-padding': '2px 4px',
             'text-background-shape': 'roundrectangle',
             'border-width': (ele) => {
-              // Priority: is_essential -> selected -> none
               if (ele.selected()) return 3;
               if (ele.data('is_essential')) return 2;
-              return 0;
+              return 1; // Subtle border to separate overlapping blobs
             },
             'border-color': (ele) => {
               if (ele.selected()) return '#FFD166';
               if (ele.data('is_essential')) return '#10B981'; // Tailwind Emerald-500
-              return '#000000';
+              return 'rgba(255, 255, 255, 0.15)';
             },
             'transition-property': 'background-color, border-width, border-color, width, height',
             'transition-duration': '0.3s'
@@ -129,7 +128,16 @@ const NetworkGraph = ({
           style: {
             'border-width': 3,
             'border-color': '#FFD166',
-            'border-opacity': 1
+            'border-opacity': 1,
+            'label': (ele) => ele.data('label') // Show label on selected
+          }
+        },
+        {
+          selector: 'node.hovered',
+          style: {
+            'label': (ele) => ele.data('label'), // Show label on hover
+            'text-background-opacity': 0.9,
+            'z-index': 100
           }
         },
         {
@@ -160,21 +168,21 @@ const NetworkGraph = ({
           style: {
             'width': (ele) => {
               const weight = ele.data('weight') || 0.5;
-              return Math.max(1, weight * 3);
+              return Math.max(0.5, weight * 1.5); // Thinner edges
             },
             'line-color': (ele) => {
               if (mode === 'ego' && ele.data('status')) {
                 const status = ele.data('status');
-                if (status === 'lost') return 'rgba(0, 240, 255, 0.5)';
-                if (status === 'gained') return 'rgba(255, 45, 141, 0.5)';
-                if (status === 'maintained') return 'rgba(155, 89, 214, 0.5)';
+                if (status === 'lost') return '#00F0FF';
+                if (status === 'gained') return '#FF2D8D';
+                if (status === 'maintained') return '#9B59D6';
               }
               return edgeColor;
             },
             'target-arrow-color': edgeColor,
             'target-arrow-shape': 'none',
             'curve-style': 'bezier',
-            'opacity': 0.6,
+            'opacity': 0.15, // Extremely sheer to prevent hairball blinding
             'transition-property': 'line-color, width, opacity',
             'transition-duration': '0.3s'
           }
@@ -196,20 +204,20 @@ const NetworkGraph = ({
       ],
       layout: {
         name: mode === 'path' ? 'breadthfirst' : 'cose',
-        padding: 30,
-        nodeRepulsion: mode === 'ego' ? 8000 : 6000,
-        nodeOverlap: 10,
-        idealEdgeLength: mode === 'ego' ? 100 : 70,
-        edgeElasticity: 200, // Increased for more bouncy movement
+        padding: 50,
+        nodeRepulsion: mode === 'ego' ? 40000 : 800000, // Massive increase to spread blob
+        nodeOverlap: 20,
+        idealEdgeLength: mode === 'ego' ? 120 : 180, // Allow longer links
+        edgeElasticity: 100, // Reduce pull back
         nestingFactor: 5,
-        gravity: mode === 'ego' ? 30 : 20, // Reduced gravity for more free movement
-        numIter: mode === 'ego' ? 600 : 800,
+        gravity: mode === 'ego' ? 50 : 20, // Low gravity to spread outward
+        numIter: mode === 'ego' ? 600 : 1500, // Let physics simulate longer
         initialTemp: 200,
         coolingFactor: 0.95,
         minTemp: 1.0,
         fit: true,
         animate: true,
-        animationDuration: 500,
+        animationDuration: 1200, // Slower cool animation
         directed: mode === 'path',
         spacingFactor: mode === 'path' ? 1.5 : 1
       },
@@ -226,6 +234,7 @@ const NetworkGraph = ({
 
     cyRef.current.on('mouseover', 'node', (evt) => {
       const node = evt.target;
+      node.addClass('hovered');
       const currentSize = node.data('size') || 16;
       node.animate({
         style: { 
@@ -237,6 +246,7 @@ const NetworkGraph = ({
 
     cyRef.current.on('mouseout', 'node', (evt) => {
       const node = evt.target;
+      node.removeClass('hovered');
       if (!node.selected()) {
         node.animate({
           style: { 
@@ -262,7 +272,7 @@ const NetworkGraph = ({
     if (!cyRef.current || !isReady) return;
 
     const nodeColor = tissue === 'normal' ? '#00F0FF' : '#FF2D8D';
-    const edgeColor = tissue === 'normal' ? 'rgba(0, 240, 255, 0.25)' : 'rgba(255, 45, 141, 0.25)';
+    const edgeColor = tissue === 'normal' ? '#00F0FF' : '#FF2D8D';
 
     cyRef.current.style()
       .selector('node')

@@ -302,6 +302,33 @@ int main(int argc, char* argv[]) {
         }
 
         // --------------------------------------------------------------------
+        // DNF MODE (Differential Network Fragility - The "Novel Contribution")
+        // --------------------------------------------------------------------
+        if (mode == "dnf") {
+            if (gene_list.empty()) {
+                std::cerr << "ERROR: DNF mode requires a gene list file as 5th argument." << std::endl;
+                std::cerr << "Usage: " << argv[0] << " <normal_net> <tumor_net> <out_dir> dnf <gene_list>" << std::endl;
+                return 1;
+            }
+
+            std::cout << "Loading NORMAL network..." << std::endl;
+            auto normal_graph = GraphLoader<long long>::load_from_file(normal_file);
+
+            std::cout << "Loading TUMOR network..." << std::endl;
+            auto tumor_graph = GraphLoader<long long>::load_from_file(tumor_file);
+
+            DNFAnalyzer<long long> dnf;
+            dnf.pairwise_dnf_analysis(
+                normal_graph,
+                tumor_graph,
+                gene_list,
+                output_dir + "/dnf_pairwise_results.txt"
+            );
+
+            return 0;
+        }
+
+        // --------------------------------------------------------------------
         // FULL ANALYSIS MODE (The "Biological Discovery")
         // --------------------------------------------------------------------
         std::cout << "Running Standard Pipeline (DiCE Analysis)..." << std::endl;

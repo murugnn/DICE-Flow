@@ -1,0 +1,121 @@
+{
+  "cancer_enrichment": {
+    "COSMIC": [
+      {
+        "top_k": 10,
+        "hits": "6",
+        "both_known": "1",
+        "hit_rate_pct": 60.0,
+        "background_rate_pct": 54.2,
+        "enrichment_fold": 1.11,
+        "pvalue": 0.4837323566365239
+      },
+      {
+        "top_k": 20,
+        "hits": "12",
+        "both_known": "2",
+        "hit_rate_pct": 60.0,
+        "background_rate_pct": 54.2,
+        "enrichment_fold": 1.11,
+        "pvalue": 0.3863920020184882
+      },
+      {
+        "top_k": 30,
+        "hits": "15",
+        "both_known": "2",
+        "hit_rate_pct": 50.0,
+        "background_rate_pct": 54.2,
+        "enrichment_fold": 0.92,
+        "pvalue": 0.741293328614155
+      },
+      {
+        "top_k": 1225,
+        "hits": "664",
+        "both_known": "120",
+        "hit_rate_pct": 54.2,
+        "background_rate_pct": 54.2,
+        "enrichment_fold": 1.0,
+        "pvalue": 0.5117568235946317
+      }
+    ],
+    "DisGeNET_PCa": [
+      {
+        "top_k": 10,
+        "hits": "2",
+        "both_known": "0",
+        "hit_rate_pct": 20.0,
+        "background_rate_pct": 11.8,
+        "enrichment_fold": 1.7,
+        "pvalue": 0.3322049366097091
+      },
+      {
+        "top_k": 20,
+        "hits": "3",
+        "both_known": "0",
+        "hit_rate_pct": 15.0,
+        "background_rate_pct": 11.8,
+        "enrichment_fold": 1.28,
+        "pvalue": 0.42309893677815896
+      },
+      {
+        "top_k": 30,
+        "hits": "4",
+        "both_known": "0",
+        "hit_rate_pct": 13.3,
+        "background_rate_pct": 11.8,
+        "enrichment_fold": 1.13,
+        "pvalue": 0.4761179465430453
+      },
+      {
+        "top_k": 1225,
+        "hits": "144",
+        "both_known": "3",
+        "hit_rate_pct": 11.8,
+        "background_rate_pct": 11.8,
+        "enrichment_fold": 1.0,
+        "pvalue": 0.5131823661472379
+      }
+    ]
+  },
+  "depmap": {
+    "status": "complete",
+    "n_pairs_with_data": 925,
+    "spearman_rho": -0.35807198526999995,
+    "spearman_p": 2.2957480931427622e-29,
+    "pearson_r": -0.3972285157869783,
+    "pearson_p": 2.5067119574276803e-36,
+    "mannwhitney_p": 1.809766522991247e-15,
+    "high_dss_mean_ess": -0.5543975468975468,
+    "low_dss_mean_ess": -0.42867170626349893
+  },
+  "baselines": {
+    "DSS (DNF)": {
+      "P@10": 0.6,
+      "P@20": 0.6,
+      "P@all": 0.5420408163265306
+    },
+    "DiCE Product": {
+      "P@10": 1.0,
+      "P@20": 0.95,
+      "P@all": 0.5420408163265306
+    },
+    "DiCE Sum": {
+      "P@10": 1.0,
+      "P@20": 0.95,
+      "P@all": 0.5420408163265306
+    }
+  },
+  "permutation": {
+    "observed_top10_mean": 6.9456500000000005,
+    "null_mean": 6.94565,
+    "null_std": 8.881784197001252e-16,
+    "p_value_mean": 0.000999000999000999,
+    "observed_max": 8.5662,
+    "p_value_max": 1.0,
+    "n_permutations": 1000,
+    "significant": "True"
+  },
+  "literature": {
+    "top_pairs_annotated": 10
+  }
+}

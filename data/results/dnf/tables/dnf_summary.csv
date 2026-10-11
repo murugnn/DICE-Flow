@@ -1,0 +1,2 @@
+total_pairs,mean_dss,std_dss,max_dss,min_dss,pairs_positive_dss,pairs_negative_dss,mean_synergy_tumor,mean_synergy_normal,pairs_synergistic_in_tumor,pairs_diff_synergy_positive,dss_ttest_statistic,dss_ttest_pvalue
+45,-2.4008777777777777,5.028402132337364,6.6549,-13.3853,14,31,0.027146666666666663,0.04058444444444444,42,9,-3.202921589497625,0.00252983081516312

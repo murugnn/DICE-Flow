@@ -15,6 +15,14 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# OpenMP support (required for DNF pairwise parallelization)
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    message(STATUS "OpenMP found: ${OpenMP_CXX_VERSION}")
+else()
+    message(WARNING "OpenMP not found. DNF pairwise analysis will run single-threaded.")
+endif()
+
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/cpp)
 
@@ -25,6 +33,11 @@ find_package(OpenMP)
 add_executable(dice_analyzer
     src/cpp/main.cpp
 )
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(dice_analyzer PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+# Link OpenMP if available
 if(OpenMP_CXX_FOUND)
     target_link_libraries(dice_analyzer PUBLIC OpenMP::OpenMP_CXX)
 endif()

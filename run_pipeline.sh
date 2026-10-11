@@ -366,7 +366,34 @@ $CPP_BIN \
     "$TOP_GENES"
 
 # ============================================================================
-# Phase 8: Extended Validation (Fitness Genes + Dual Dataset)
+# Phase 7.5: Differential Network Fragility (DNF) — Pairwise Analysis
+# ============================================================================
+
+log_info "=== Phase 7.5: Differential Network Fragility (DNF) ==="
+log_info "Computing pairwise combinatorial knockouts on top DiCE genes..."
+
+DNF_GENES="$RESULTS_DIR/genes_for_dnf.txt"
+tail -n +2 "$RESULTS_DIR/dice_genes_top500.txt" | cut -f1 | head -50 > "$DNF_GENES"
+
+$CPP_BIN \
+    "$NORMAL_INT" \
+    "$TUMOR_INT" \
+    "$RESULTS_DIR" \
+    "dnf" \
+    "$DNF_GENES"
+
+if [ -f "$RESULTS_DIR/dnf_pairwise_results.txt" ]; then
+    log_info "DNF computation complete. Running post-analysis..."
+    $PYTHON src/python/dnf_analysis.py \
+        --dnf-results "$RESULTS_DIR/dnf_pairwise_results.txt" \
+        --dice-genes "$RESULTS_DIR/dice_genes_top500.txt" \
+        --output-dir "$RESULTS_DIR/dnf" \
+        2>&1 | while read line; do log_info "  $line"; done
+    log_info "DNF analysis complete."
+else
+    log_info "DNF pairwise results not found. Skipping post-analysis."
+fi
+
 # ============================================================================
 
 log_info "=== Phase 8: Extended Validation ==="

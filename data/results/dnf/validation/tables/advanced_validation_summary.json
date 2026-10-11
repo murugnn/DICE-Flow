@@ -1,0 +1,167 @@
+{
+  "v6_pair_level": {
+    "cutoff_results": [
+      {
+        "top_k": 10,
+        "interacting_pairs": "4",
+        "total": 10,
+        "hit_rate_pct": 40.0,
+        "background_pct": 38.9,
+        "fold_enrichment": 1.03,
+        "pvalue": 0.590763339970579
+      },
+      {
+        "top_k": 20,
+        "interacting_pairs": "7",
+        "total": 20,
+        "hit_rate_pct": 35.0,
+        "background_pct": 38.9,
+        "fold_enrichment": 0.9,
+        "pvalue": 0.7181116481463248
+      },
+      {
+        "top_k": 50,
+        "interacting_pairs": "19",
+        "total": 50,
+        "hit_rate_pct": 38.0,
+        "background_pct": 38.9,
+        "fold_enrichment": 0.98,
+        "pvalue": 0.6066981750474971
+      },
+      {
+        "top_k": 100,
+        "interacting_pairs": "35",
+        "total": 100,
+        "hit_rate_pct": 35.0,
+        "background_pct": 38.9,
+        "fold_enrichment": 0.9,
+        "pvalue": 0.8182992764538732
+      },
+      {
+        "top_k": 1225,
+        "interacting_pairs": "477",
+        "total": 1225,
+        "hit_rate_pct": 38.9,
+        "background_pct": 38.9,
+        "fold_enrichment": 1.0,
+        "pvalue": 0.5108242852187894
+      }
+    ],
+    "n_novel": 31,
+    "n_known": 19,
+    "mannwhitney_p": 0.06705981481875434
+  },
+  "v6b_synlethdb": {
+    "total_sl_in_db": 37536,
+    "total_hits_in_dnf": 7,
+    "background_rate": 0.005714285714285714,
+    "cutoff_results": [
+      {
+        "top_k": 10,
+        "sl_hits": 0,
+        "total": 10,
+        "hit_rate_pct": 0.0,
+        "background_pct": 0.6,
+        "fold_enrichment": 0.0,
+        "binomial_p": 1.0,
+        "hypergeom_p": 1.0
+      },
+      {
+        "top_k": 20,
+        "sl_hits": 0,
+        "total": 20,
+        "hit_rate_pct": 0.0,
+        "background_pct": 0.6,
+        "fold_enrichment": 0.0,
+        "binomial_p": 1.0,
+        "hypergeom_p": 1.0
+      },
+      {
+        "top_k": 50,
+        "sl_hits": 0,
+        "total": 50,
+        "hit_rate_pct": 0.0,
+        "background_pct": 0.6,
+        "fold_enrichment": 0.0,
+        "binomial_p": 1.0,
+        "hypergeom_p": 1.0
+      },
+      {
+        "top_k": 100,
+        "sl_hits": 0,
+        "total": 100,
+        "hit_rate_pct": 0.0,
+        "background_pct": 0.6,
+        "fold_enrichment": 0.0,
+        "binomial_p": 1.0,
+        "hypergeom_p": 1.0
+      },
+      {
+        "top_k": 1225,
+        "sl_hits": 7,
+        "total": 1225,
+        "hit_rate_pct": 0.6,
+        "background_pct": 0.6,
+        "fold_enrichment": 1.0,
+        "binomial_p": 0.5507160334341474,
+        "hypergeom_p": 1.0
+      }
+    ],
+    "n_novel_top50": 50,
+    "mannwhitney_p": 0.40632661355462496,
+    "sl_mean_dss": -0.35232857142857144,
+    "non_sl_mean_dss": -0.04974441707717571
+  },
+  "v7_pathway": {
+    "top_k": 50,
+    "top_sharing_pct": 0.0,
+    "bottom_sharing_pct": 8.0,
+    "fisher_p": 1.0,
+    "odds_ratio": 0.0,
+    "spearman_rho": -0.1365129117272534,
+    "spearman_p": 1.622367787378538e-06
+  },
+  "v8_tumor_specificity": {
+    "all_pairs": {
+      "n": 1225,
+      "mean_delta_tumor": 2.2458871020408164,
+      "mean_delta_normal": 2.2973611428571425,
+      "mean_dss": -0.05147404081632662,
+      "wilcoxon_W": 394031.5,
+      "wilcoxon_p": 0.06688866298650693,
+      "ttest_t": -0.6335103599402654,
+      "ttest_p": 0.5265187716755804,
+      "cohens_d": -0.018107688400479504
+    },
+    "top_10": {
+      "n": 10,
+      "mean_delta_tumor": 10.04892,
+      "mean_delta_normal": 3.1032699999999998,
+      "mean_dss": 6.9456500000000005,
+      "wilcoxon_p": 0.0009765625,
+      "cohens_d": 8.845748756961354
+    },
+    "top_20": {
+      "n": 20,
+      "mean_delta_tumor": 8.903834999999999,
+      "mean_delta_normal": 2.7466500000000003,
+      "mean_dss": 6.157185,
+      "wilcoxon_p": 9.5367431640625e-07,
+      "cohens_d": 6.340479523058995
+    },
+    "top_50": {
+      "n": 50,
+      "mean_delta_tumor": 7.793842000000001,
+      "mean_delta_normal": 2.520568,
+      "mean_dss": 5.273273999999999,
+      "wilcoxon_p": 8.881784197001252e-16,
+      "cohens_d": 5.430406394478301
+    },
+    "fraction_tumor_selective": {
+      "n_positive": 608,
+      "n_total": 1225,
+      "fraction": 0.4963265306122449,
+      "binomial_p": 0.6124446739260213
+    }
+  }
+}

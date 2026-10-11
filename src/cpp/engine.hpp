@@ -8,6 +8,9 @@
 #include <queue>
 #include <cmath>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 #include <chrono>
 #include <omp.h>
 #include <set>
@@ -520,5 +523,331 @@ Graph<W> induce_subgraph(const Graph<W>& g, int k) {
     }
     return s;
 }
+
+// ============================================================================
+// DIFFERENTIAL NETWORK FRAGILITY (DNF) MODULE
+// ============================================================================
+// Identifies gene pairs whose combined removal selectively collapses the
+// tumor network while leaving the normal network structurally intact.
+// Core metric: DSS(A,B) = ΔASPL_tumor(A,B) - ΔASPL_normal(A,B)
+// ============================================================================
+
+struct ASPLResult {
+    double aspl;           // Average Shortest Path Length
+    int lcc_size;          // Largest Connected Component size
+    int reachable_pairs;   // Number of reachable node pairs
+};
+
+template<typename WeightType = long long>
+class DNFAnalyzer {
+private:
+    const WeightType INF = std::numeric_limits<WeightType>::max();
+
+    // Number of SSSP source samples for ASPL estimation.
+    // Higher = more accurate but slower. 200 is a good balance for O(n^2) outer loop.
+    static constexpr int ASPL_SAMPLES = 200;
+
+public:
+
+    // Compute ASPL and LCC size for a given graph.
+    // Uses sampled SSSP sources for efficiency.
+    ASPLResult compute_aspl_and_lcc(const Graph<WeightType>& g) {
+        ShortestPathEngine<WeightType> engine(g);
+        int n = g.n_vertices;
+        ASPLResult result = {0.0, 0, 0};
+
+        if (n == 0) return result;
+
+        // --- Compute LCC size via BFS from node 0, then try all ---
+        // We do a quick reachability check from sampled nodes
+        std::vector<bool> visited(n, false);
+        int max_component = 0;
+
+        for (int start = 0; start < n; start++) {
+            if (visited[start]) continue;
+            // BFS to find this component
+            int comp_size = 0;
+            std::queue<int> bfs_q;
+            bfs_q.push(start);
+            visited[start] = true;
+            while (!bfs_q.empty()) {
+                int u = bfs_q.front(); bfs_q.pop();
+                comp_size++;
+                for (const auto& e : g.adj[u]) {
+                    if (!visited[e.to]) {
+                        visited[e.to] = true;
+                        bfs_q.push(e.to);
+                    }
+                }
+            }
+            max_component = std::max(max_component, comp_size);
+        }
+        result.lcc_size = max_component;
+
+        // --- Compute ASPL from sampled sources ---
+        int samples = std::min(ASPL_SAMPLES, n);
+        double total_dist = 0.0;
+        int count = 0;
+
+        for (int i = 0; i < samples; i++) {
+            int source = (int)((long long)i * n / samples);
+            auto distances = engine.compute_sssp(source);
+            for (int j = 0; j < n; j++) {
+                if (j != source && distances[j] != INF) {
+                    total_dist += (double)distances[j];
+                    count++;
+                }
+            }
+        }
+
+        result.aspl = (count > 0) ? total_dist / count : 0.0;
+        result.reachable_pairs = count;
+        return result;
+    }
+
+    // Create a graph with TWO nodes (and all their edges) removed.
+    Graph<WeightType> create_dual_knockout_graph(const Graph<WeightType>& g, int ko_a, int ko_b) {
+        Graph<WeightType> ko_graph(g.n_vertices);
+        ko_graph.name_to_id = g.name_to_id;
+        ko_graph.id_to_name = g.id_to_name;
+
+        for (int u = 0; u < g.n_vertices; u++) {
+            if (u == ko_a || u == ko_b) continue;
+            for (const auto& e : g.adj[u]) {
+                if (e.to != ko_a && e.to != ko_b) {
+                    ko_graph.add_edge(u, e.to, e.weight);
+                }
+            }
+        }
+        return ko_graph;
+    }
+
+    // The main DNF analysis: compute DSS for all pairs in the gene list.
+    // Runs on BOTH graphs and outputs the differential score.
+    void pairwise_dnf_analysis(
+        const Graph<WeightType>& normal_graph,
+        const Graph<WeightType>& tumor_graph,
+        const std::string& gene_list_file,
+        const std::string& output_file)
+    {
+        std::cout << "\n============================================" << std::endl;
+        std::cout << "  DIFFERENTIAL NETWORK FRAGILITY (DNF)" << std::endl;
+        std::cout << "  Pairwise Combinatorial Knockout Analysis" << std::endl;
+        std::cout << "============================================\n" << std::endl;
+
+        // 1. Load gene list
+        std::vector<std::string> genes;
+        std::ifstream gfile(gene_list_file);
+        if (!gfile.is_open()) {
+            std::cerr << "ERROR: Cannot open gene list: " << gene_list_file << std::endl;
+            return;
+        }
+        std::string gene;
+        while (std::getline(gfile, gene)) {
+            if (!gene.empty() && gene[0] != '#') {
+                gene.erase(gene.find_last_not_of(" \n\r\t") + 1);
+                genes.push_back(gene);
+            }
+        }
+        gfile.close();
+
+        // 2. Resolve gene names to IDs in both graphs. Only keep genes present in BOTH.
+        struct GenePair { std::string name; int normal_id; int tumor_id; };
+        std::vector<GenePair> valid_genes;
+
+        for (const auto& g : genes) {
+            auto it_n = normal_graph.name_to_id.find(g);
+            auto it_t = tumor_graph.name_to_id.find(g);
+            if (it_n != normal_graph.name_to_id.end() && it_t != tumor_graph.name_to_id.end()) {
+                valid_genes.push_back({g, it_n->second, it_t->second});
+            }
+        }
+
+        int N = valid_genes.size();
+        int total_pairs = N * (N - 1) / 2;
+        std::cout << "Genes loaded: " << genes.size() << std::endl;
+        std::cout << "Genes in both networks: " << N << std::endl;
+        std::cout << "Total pairs to compute: " << total_pairs << std::endl;
+
+        if (N < 2) {
+            std::cerr << "ERROR: Need at least 2 genes for pairwise analysis." << std::endl;
+            return;
+        }
+
+        // 3. Compute baselines
+        std::cout << "\nComputing baseline ASPL + LCC..." << std::endl;
+        auto t_start = std::chrono::high_resolution_clock::now();
+
+        ASPLResult baseline_normal = compute_aspl_and_lcc(normal_graph);
+        ASPLResult baseline_tumor = compute_aspl_and_lcc(tumor_graph);
+
+        std::cout << "  Normal baseline: ASPL=" << std::fixed << std::setprecision(2)
+                  << baseline_normal.aspl << "  LCC=" << baseline_normal.lcc_size << std::endl;
+        std::cout << "  Tumor  baseline: ASPL=" << std::fixed << std::setprecision(2)
+                  << baseline_tumor.aspl << "  LCC=" << baseline_tumor.lcc_size << std::endl;
+
+        // 4. Compute single-gene knockout baselines (for synergy calculation)
+        std::cout << "\nComputing single-gene knockout baselines..." << std::endl;
+        std::vector<double> single_delta_normal(N), single_delta_tumor(N);
+        std::vector<int> single_lcc_normal(N), single_lcc_tumor(N);
+
+        for (int i = 0; i < N; i++) {
+            // Normal single knockout
+            Graph<WeightType> ko_n(normal_graph.n_vertices);
+            ko_n.name_to_id = normal_graph.name_to_id;
+            ko_n.id_to_name = normal_graph.id_to_name;
+            for (int u = 0; u < normal_graph.n_vertices; u++) {
+                if (u == valid_genes[i].normal_id) continue;
+                for (const auto& e : normal_graph.adj[u]) {
+                    if (e.to != valid_genes[i].normal_id) ko_n.add_edge(u, e.to, e.weight);
+                }
+            }
+            auto r_n = compute_aspl_and_lcc(ko_n);
+            single_delta_normal[i] = r_n.aspl - baseline_normal.aspl;
+            single_lcc_normal[i] = r_n.lcc_size;
+
+            // Tumor single knockout
+            Graph<WeightType> ko_t(tumor_graph.n_vertices);
+            ko_t.name_to_id = tumor_graph.name_to_id;
+            ko_t.id_to_name = tumor_graph.id_to_name;
+            for (int u = 0; u < tumor_graph.n_vertices; u++) {
+                if (u == valid_genes[i].tumor_id) continue;
+                for (const auto& e : tumor_graph.adj[u]) {
+                    if (e.to != valid_genes[i].tumor_id) ko_t.add_edge(u, e.to, e.weight);
+                }
+            }
+            auto r_t = compute_aspl_and_lcc(ko_t);
+            single_delta_tumor[i] = r_t.aspl - baseline_tumor.aspl;
+            single_lcc_tumor[i] = r_t.lcc_size;
+        }
+        std::cout << "  Single-gene baselines computed." << std::endl;
+
+        // 5. Pairwise knockout with OpenMP parallelization
+        struct PairResult {
+            int idx_a, idx_b;
+            double delta_aspl_normal, delta_aspl_tumor;
+            double dss;                 // Differential Synergy Score
+            double synergy_tumor;       // Synergy in tumor: Δpair - (Δa + Δb)
+            double synergy_normal;      // Synergy in normal
+            double differential_synergy; // synergy_tumor - synergy_normal
+            int lcc_normal_ko, lcc_tumor_ko;
+        };
+
+        std::vector<PairResult> results(total_pairs);
+        int progress = 0;
+
+        std::cout << "\nRunning pairwise knockouts (" << total_pairs << " pairs)..." << std::endl;
+
+        #pragma omp parallel for schedule(dynamic) shared(progress)
+        for (int idx = 0; idx < total_pairs; idx++) {
+            // Map linear index to (i, j) pair
+            // idx = i*(i-1)/2 + j where j < i
+            int i = (int)(0.5 + std::sqrt(0.25 + 2.0 * idx));
+            int j = idx - i * (i - 1) / 2;
+            if (j >= i) { i++; j = idx - i * (i - 1) / 2; }
+
+            // Normal network knockout
+            auto ko_normal = create_dual_knockout_graph(normal_graph,
+                valid_genes[i].normal_id, valid_genes[j].normal_id);
+            auto res_normal = compute_aspl_and_lcc(ko_normal);
+
+            // Tumor network knockout
+            auto ko_tumor = create_dual_knockout_graph(tumor_graph,
+                valid_genes[i].tumor_id, valid_genes[j].tumor_id);
+            auto res_tumor = compute_aspl_and_lcc(ko_tumor);
+
+            // Compute metrics
+            double d_normal = res_normal.aspl - baseline_normal.aspl;
+            double d_tumor = res_tumor.aspl - baseline_tumor.aspl;
+            double dss = d_tumor - d_normal;
+
+            // Synergy: Is the pair effect greater than sum of individual effects?
+            double syn_tumor = d_tumor - (single_delta_tumor[i] + single_delta_tumor[j]);
+            double syn_normal = d_normal - (single_delta_normal[i] + single_delta_normal[j]);
+
+            results[idx] = {
+                i, j,
+                d_normal, d_tumor,
+                dss,
+                syn_tumor, syn_normal,
+                syn_tumor - syn_normal,  // differential synergy
+                res_normal.lcc_size, res_tumor.lcc_size
+            };
+
+            // Progress reporting (thread-safe)
+            #pragma omp atomic
+            progress++;
+
+            if (progress % 100 == 0 || progress == total_pairs) {
+                #pragma omp critical
+                {
+                    std::cout << "\r  Progress: " << progress << "/" << total_pairs
+                              << " (" << (100 * progress / total_pairs) << "%)" << std::flush;
+                }
+            }
+        }
+        std::cout << std::endl;
+
+        // 6. Sort by DSS (descending — highest tumor disruption relative to normal)
+        std::sort(results.begin(), results.end(),
+                  [](const PairResult& a, const PairResult& b) { return a.dss > b.dss; });
+
+        // 7. Write output
+        auto t_end = std::chrono::high_resolution_clock::now();
+        double elapsed = std::chrono::duration<double>(t_end - t_start).count();
+
+        std::ofstream out(output_file);
+        out << "gene_a\tgene_b\tdss\tsynergy_tumor\tsynergy_normal\tdifferential_synergy\t"
+            << "delta_aspl_tumor\tdelta_aspl_normal\t"
+            << "lcc_tumor_ko\tlcc_normal_ko\t"
+            << "baseline_aspl_tumor\tbaseline_aspl_normal\t"
+            << "baseline_lcc_tumor\tbaseline_lcc_normal\n";
+
+        for (const auto& r : results) {
+            out << valid_genes[r.idx_a].name << "\t"
+                << valid_genes[r.idx_b].name << "\t"
+                << std::fixed << std::setprecision(4)
+                << r.dss << "\t"
+                << r.synergy_tumor << "\t"
+                << r.synergy_normal << "\t"
+                << r.differential_synergy << "\t"
+                << r.delta_aspl_tumor << "\t"
+                << r.delta_aspl_normal << "\t"
+                << r.lcc_tumor_ko << "\t"
+                << r.lcc_normal_ko << "\t"
+                << baseline_tumor.aspl << "\t"
+                << baseline_normal.aspl << "\t"
+                << baseline_tumor.lcc_size << "\t"
+                << baseline_normal.lcc_size << "\n";
+        }
+        out.close();
+
+        // 8. Print summary
+        std::cout << "\n=== DNF Analysis Complete ===" << std::endl;
+        std::cout << "Time elapsed: " << std::fixed << std::setprecision(1) << elapsed << "s" << std::endl;
+        std::cout << "Pairs analyzed: " << total_pairs << std::endl;
+        std::cout << "Output: " << output_file << std::endl;
+
+        std::cout << "\nTop 10 Tumor-Selective Vulnerable Pairs (Highest DSS):" << std::endl;
+        std::cout << std::left << std::setw(12) << "Gene_A"
+                  << std::setw(12) << "Gene_B"
+                  << std::setw(12) << "DSS"
+                  << std::setw(14) << "Synergy_T"
+                  << std::setw(14) << "Synergy_N"
+                  << std::setw(14) << "Diff_Synergy" << std::endl;
+        std::cout << std::string(78, '-') << std::endl;
+
+        int top_n = std::min(10, (int)results.size());
+        for (int k = 0; k < top_n; k++) {
+            const auto& r = results[k];
+            std::cout << std::left << std::setw(12) << valid_genes[r.idx_a].name
+                      << std::setw(12) << valid_genes[r.idx_b].name
+                      << std::setw(12) << std::fixed << std::setprecision(4) << r.dss
+                      << std::setw(14) << r.synergy_tumor
+                      << std::setw(14) << r.synergy_normal
+                      << std::setw(14) << r.differential_synergy << std::endl;
+        }
+    }
+};
 
 #endif

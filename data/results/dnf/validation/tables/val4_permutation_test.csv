@@ -1,0 +1,2 @@
+observed_top10_mean,null_mean,null_std,p_value_mean,observed_max,p_value_max,n_permutations,significant
+6.9456500000000005,6.94565,8.881784197001252e-16,0.000999000999000999,8.5662,1.0,1000,True
